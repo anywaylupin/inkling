@@ -30,7 +30,7 @@ inkling owns Status, Last deploy, Deploy state, Usage, Usage note, Last checked 
 3. Copy `.dev.vars.example` to `.dev.vars` and fill in `NOTION_TOKEN`, `NOTION_DATA_SOURCE_ID` and the provider tokens you use. See [SECURITY.md](SECURITY.md) for scopes.
 4. Run `pnpm setup:notion` to add the inkling-owned properties to the data source.
 5. Log in to Cloudflare with `pnpm wrangler login`.
-6. Run `pnpm wrangler kv namespace create INKLING_STATE` and paste the id into `wrangler.jsonc`.
+6. Run `pnpm wrangler kv namespace create INKLING_STATE` and put its id in `wrangler.jsonc` when you fork this repo.
 7. Set each secret with `pnpm wrangler secret put NOTION_TOKEN`, and repeat for every other value in `.dev.vars`.
 8. Try one run locally: start `pnpm dev`, then `curl "http://localhost:8787/__scheduled?cron=*/15+*+*+*+*"`.
 9. Deploy with `pnpm deploy`, or push to `main` and let CI deploy, then watch a run with `pnpm wrangler tail`.

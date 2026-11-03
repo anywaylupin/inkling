@@ -4,9 +4,6 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-28",
   "triggers": { "crons": ["*/15 * * * *"] },
-  "kv_namespaces": [
-    // Paste the id printed by `pnpm wrangler kv namespace create INKLING_STATE`.
-    { "binding": "INKLING_STATE", "id": "replace-with-kv-namespace-id" },
-  ],
+  "kv_namespaces": [{ "binding": "INKLING_STATE", "id": "ca726b93a5aa4b1e857b22e5c793f9a8" }],
   "observability": { "enabled": true },
 }
