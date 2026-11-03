@@ -1,0 +1,11 @@
+[
+  {
+    "deploy": {
+      "id": "dep-1",
+      "status": "live",
+      "createdAt": "2026-11-01T10:00:00Z",
+      "finishedAt": "2026-11-01T10:03:00Z"
+    },
+    "cursor": "c1"
+  }
+]

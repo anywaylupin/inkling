@@ -1,0 +1,35 @@
+{
+  "name": "inkling",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turns a Notion database of cloud services into a live status board",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy",
+    "setup:notion": "node --env-file=.dev.vars scripts/setup-notion.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@notionhq/client": "^5.30.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.12",
+    "@cloudflare/workers-types": "^5.20261102.1",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.14.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.14.0",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5",
+    "wrangler": "^4.156.1"
+  }
+}

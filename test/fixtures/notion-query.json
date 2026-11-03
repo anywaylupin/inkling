@@ -1,0 +1,60 @@
+{
+  "object": "list",
+  "results": [
+    {
+      "object": "page",
+      "id": "page-http",
+      "url": "https://www.notion.so/page-http",
+      "properties": {
+        "Name": { "id": "title", "type": "title", "title": [{ "plain_text": "Landing page" }] },
+        "Provider": {
+          "id": "p",
+          "type": "select",
+          "select": { "id": "s1", "name": "http", "color": "blue" }
+        },
+        "Resource ID": {
+          "id": "r",
+          "type": "rich_text",
+          "rich_text": [{ "plain_text": "https://example.com" }]
+        },
+        "Monitor": { "id": "m", "type": "checkbox", "checkbox": true }
+      }
+    },
+    {
+      "object": "page",
+      "id": "page-github",
+      "url": "https://www.notion.so/page-github",
+      "properties": {
+        "Name": { "id": "title", "type": "title", "title": [{ "plain_text": "Site repo" }] },
+        "Provider": {
+          "id": "p",
+          "type": "select",
+          "select": { "id": "s2", "name": "github", "color": "gray" }
+        },
+        "Resource ID": {
+          "id": "r",
+          "type": "rich_text",
+          "rich_text": [{ "plain_text": "acme/site" }]
+        },
+        "Monitor": { "id": "m", "type": "checkbox", "checkbox": true }
+      }
+    },
+    {
+      "object": "page",
+      "id": "page-incomplete",
+      "url": "https://www.notion.so/page-incomplete",
+      "properties": {
+        "Name": { "id": "title", "type": "title", "title": [{ "plain_text": "No resource yet" }] },
+        "Provider": {
+          "id": "p",
+          "type": "select",
+          "select": { "id": "s3", "name": "vercel", "color": "gray" }
+        },
+        "Resource ID": { "id": "r", "type": "rich_text", "rich_text": [] },
+        "Monitor": { "id": "m", "type": "checkbox", "checkbox": true }
+      }
+    }
+  ],
+  "next_cursor": null,
+  "has_more": false
+}

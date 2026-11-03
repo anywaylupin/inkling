@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "errors": [],
+  "messages": [],
+  "result": {
+    "deployments": [
+      {
+        "id": "d1",
+        "source": "wrangler",
+        "strategy": "percentage",
+        "created_on": "2026-10-31T14:02:11.123Z"
+      }
+    ]
+  }
+}

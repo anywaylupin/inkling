@@ -1,0 +1,34 @@
+import { Client } from "@notionhq/client";
+import { INKLING_PROPERTIES, NOTION_VERSION } from "../src/schema.ts";
+
+const { NOTION_TOKEN, NOTION_DATA_SOURCE_ID } = process.env;
+if (!NOTION_TOKEN || !NOTION_DATA_SOURCE_ID) {
+  console.error("Set NOTION_TOKEN and NOTION_DATA_SOURCE_ID in .dev.vars first.");
+  process.exit(1);
+}
+
+const notion = new Client({ auth: NOTION_TOKEN, notionVersion: NOTION_VERSION });
+const source = await notion.dataSources.retrieve({ data_source_id: NOTION_DATA_SOURCE_ID });
+const existing = "properties" in source ? source.properties : {};
+
+const missing = Object.entries(INKLING_PROPERTIES).filter(([name]) => !(name in existing));
+const mismatched = Object.entries(INKLING_PROPERTIES).filter(
+  ([name, definition]) => name in existing && existing[name]?.type !== Object.keys(definition)[0],
+);
+
+for (const [name, definition] of mismatched) {
+  console.warn(
+    `${name} exists as ${existing[name]?.type}, expected ${Object.keys(definition)[0]}.`,
+  );
+  console.warn("inkling leaves it alone, but writes to it will fail until you change its type.");
+}
+
+if (missing.length === 0) {
+  console.log("All inkling properties already exist.");
+} else {
+  await notion.dataSources.update({
+    data_source_id: NOTION_DATA_SOURCE_ID,
+    properties: Object.fromEntries(missing),
+  });
+  console.log(`Added ${missing.map(([name]) => name).join(", ")}.`);
+}

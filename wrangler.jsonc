@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "inkling",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-28",
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "kv_namespaces": [
+    // Paste the id printed by `pnpm wrangler kv namespace create INKLING_STATE`.
+    { "binding": "INKLING_STATE", "id": "replace-with-kv-namespace-id" },
+  ],
+  "observability": { "enabled": true },
+}

@@ -1,0 +1,12 @@
+{
+  "deployments": [
+    {
+      "uid": "dpl_1",
+      "target": "production",
+      "state": "READY",
+      "readyState": "READY",
+      "created": 1793436000000
+    }
+  ],
+  "pagination": { "count": 1, "next": null, "prev": null }
+}

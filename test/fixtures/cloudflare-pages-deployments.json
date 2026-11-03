@@ -1,0 +1,13 @@
+{
+  "success": true,
+  "errors": [],
+  "messages": [],
+  "result": [
+    {
+      "id": "p1",
+      "environment": "production",
+      "created_on": "2026-11-01T08:00:00Z",
+      "latest_stage": { "name": "deploy", "status": "success" }
+    }
+  ]
+}
