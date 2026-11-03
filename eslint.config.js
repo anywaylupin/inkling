@@ -6,5 +6,6 @@ export default tseslint.config(
   { ignores: ["node_modules", ".wrangler", "coverage"] },
   js.configs.recommended,
   tseslint.configs.strict,
+  { rules: { "@typescript-eslint/no-namespace": ["error", { allowDeclarations: true }] } },
   prettier,
 );

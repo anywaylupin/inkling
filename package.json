@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "wrangler dev --test-scheduled",
     "deploy": "wrangler deploy",
-    "setup:notion": "node --env-file=.dev.vars scripts/setup-notion.ts",
+    "setup:notion": "node --env-file-if-exists=.dev.vars scripts/setup-notion.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
