@@ -7,6 +7,7 @@
       "id": "p1",
       "environment": "production",
       "created_on": "2026-11-01T08:00:00Z",
+      "url": "https://a1b2c3.site.pages.dev",
       "latest_stage": { "name": "deploy", "status": "success" }
     }
   ]

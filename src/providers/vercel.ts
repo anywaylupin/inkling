@@ -10,12 +10,13 @@ const STATES: Record<string, Status> = {
 };
 
 interface Deployments {
-  deployments: { created: number; state?: string; readyState?: string }[];
+  deployments: { created: number; url: string; state?: string; readyState?: string }[];
 }
 
 /** Reads a project id; only the latest production deployment counts. */
 export const vercel: Provider = {
   id: "vercel",
+  link: () => "https://vercel.com/dashboard",
   async check(projectId, env) {
     if (!env.VERCEL_TOKEN) return missingSecret("VERCEL_TOKEN");
     const query = new URLSearchParams({ projectId, target: "production", limit: "1" });
@@ -30,6 +31,7 @@ export const vercel: Provider = {
       status: STATES[state] ?? "Unknown",
       lastDeploy: new Date(latest.created).toISOString(),
       deployState: state,
+      url: `https://${latest.url}`,
     };
   },
 };

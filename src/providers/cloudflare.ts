@@ -7,7 +7,7 @@ interface WorkerDeployments {
 }
 
 interface PagesDeployments {
-  result: { created_on: string; latest_stage: { name: string; status: string } }[];
+  result: { created_on: string; url: string; latest_stage: { name: string; status: string } }[];
 }
 
 /** Pages reports a stage per build step; only the last one says whether the deploy landed. */
@@ -19,6 +19,7 @@ function pagesCheck({ result }: PagesDeployments): Check {
     status: status === "success" ? "Up" : status === "failure" ? "Down" : "Degraded",
     lastDeploy: deployment.created_on,
     deployState: `${name} ${status}`,
+    url: deployment.url,
   };
 }
 
@@ -29,6 +30,13 @@ function pagesCheck({ result }: PagesDeployments): Check {
  */
 export const cloudflare: Provider = {
   id: "cloudflare",
+  link(resourceId, env) {
+    if (!env.CF_ACCOUNT_ID) return "https://dash.cloudflare.com";
+    const base = `https://dash.cloudflare.com/${env.CF_ACCOUNT_ID}`;
+    return resourceId.startsWith(PAGES_PREFIX)
+      ? `${base}/pages/view/${encodeURIComponent(resourceId.slice(PAGES_PREFIX.length))}`
+      : `${base}/workers/services/view/${encodeURIComponent(resourceId)}/production`;
+  },
   async check(resourceId, env) {
     if (!env.CF_API_TOKEN) return missingSecret("CF_API_TOKEN");
     if (!env.CF_ACCOUNT_ID) return missingSecret("CF_ACCOUNT_ID");

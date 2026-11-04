@@ -1,5 +1,5 @@
 import { Client } from "@notionhq/client";
-import { INKLING_PROPERTIES, NOTION_VERSION } from "../src/schema.ts";
+import { INKLING_PROPERTIES, NOTION_VERSION, STATUS_OPTIONS } from "../src/schema.ts";
 
 const { NOTION_TOKEN, NOTION_DATA_SOURCE_ID } = process.env;
 if (!NOTION_TOKEN || !NOTION_DATA_SOURCE_ID) {
@@ -21,6 +21,14 @@ for (const [name, definition] of mismatched) {
     `${name} exists as ${existing[name]?.type}, expected ${Object.keys(definition)[0]}.`,
   );
   console.warn("inkling leaves it alone, but writes to it will fail until you change its type.");
+}
+
+const status = existing["Status"];
+const statusNames = status?.type === "status" ? status.status.options.map((o) => o.name) : [];
+const missingOptions = STATUS_OPTIONS.filter((name) => !statusNames.includes(name));
+if (status?.type !== "status" || missingOptions.length > 0) {
+  console.warn("The API cannot create a status property, so set up Status by hand in Notion:");
+  console.warn(`a property named Status of type Status with options ${STATUS_OPTIONS.join(", ")}.`);
 }
 
 if (missing.length === 0) {

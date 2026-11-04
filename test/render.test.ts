@@ -11,6 +11,7 @@ describe("render", () => {
       status: "Up",
       lastDeploy: "2026-11-01T10:03:00Z",
       deployState: "live",
+      url: "https://api.onrender.com",
     });
   });
 

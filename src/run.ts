@@ -7,8 +7,8 @@ import { throttle } from "./throttle";
 
 const HOUR_MS = 60 * 60 * 1000;
 
-/** Fields whose change triggers a Notion write; Usage note rides along but never triggers one. */
-const DIFF_FIELDS = ["status", "lastDeploy", "deployState", "usage", "error"] as const;
+/** Fields whose change triggers a Notion write. */
+const DIFF_FIELDS = ["status", "lastDeploy", "deployState", "url", "error"] as const;
 
 /** What the last run wrote for one row, keyed by page id inside each provider's KV entry. */
 type Snapshot = Pick<Check, (typeof DIFF_FIELDS)[number]> & { checkedAt: string };
@@ -19,16 +19,23 @@ export function nextProvider(present: ProviderId[], last: string | null): Provid
   return present.find((id) => PROVIDER_IDS.indexOf(id) > lastIndex) ?? present.at(0);
 }
 
-/** Runs one adapter and turns any throw into an Unknown row, logging the provider id and error code only. */
+/**
+ * Runs one adapter and turns any throw into an Unknown row, logging the provider id and error code only.
+ *
+ * The provider's static link fills URL whenever the check has none, so the column is never empty.
+ */
 async function safeCheck(row: Row, env: Env): Promise<Check> {
+  const provider = providers[row.provider];
+  let check: Check;
   try {
-    return await providers[row.provider].check(row.resourceId, env);
+    check = await provider.check(row.resourceId, env);
   } catch (error) {
     const code =
       error instanceof ApiError ? error.message : error instanceof Error ? error.name : "Error";
     console.error(`${row.provider} check failed: ${code}`);
-    return { status: "Unknown", error: `Check failed: ${code}` };
+    check = { status: "Unknown", error: `Check failed: ${code}` };
   }
+  return { ...check, url: check.url ?? provider.link(row.resourceId, env) };
 }
 
 /** Posts a status change to the ntfy topic; the row name stays in the body because headers must be Latin-1. */
@@ -85,8 +92,8 @@ async function updateRow(
     }
   }
   if (prev && prev.status !== check.status) await alert(env, row, prev.status, check.status);
-  const { status, lastDeploy, deployState, usage, error } = check;
-  return { status, lastDeploy, deployState, usage, error, checkedAt };
+  const { status, lastDeploy, deployState, url, error } = check;
+  return { status, lastDeploy, deployState, url, error, checkedAt };
 }
 
 /** Reads one provider's snapshots from KV. */

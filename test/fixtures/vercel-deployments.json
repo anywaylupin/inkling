@@ -3,6 +3,7 @@
     {
       "uid": "dpl_1",
       "target": "production",
+      "url": "project-a-abc123.vercel.app",
       "state": "READY",
       "readyState": "READY",
       "created": 1793436000000

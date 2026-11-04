@@ -7,19 +7,20 @@ export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export type Status = "Up" | "Degraded" | "Down" | "Unknown";
 
-/** One provider's verdict on one row; `usage` is a fraction, shown as a percent in Notion. */
+/** One provider's verdict on one row; `url` is the live URL when the API reports one. */
 export interface Check {
   status: Status;
   lastDeploy?: string;
   deployState?: string;
-  usage?: number;
-  usageNote?: string;
+  url?: string;
   error?: string;
 }
 
 export interface Provider {
   id: ProviderId;
   check(resourceId: string, env: Env): Promise<Check>;
+  /** A URL built without any API call, used when the check fails or reports no live URL. */
+  link(resourceId: string, env: Env): string;
 }
 
 /** Carries only the HTTP status, so logs and the Error column never echo a response body. */

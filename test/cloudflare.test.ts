@@ -21,6 +21,7 @@ describe("cloudflare", () => {
       status: "Up",
       lastDeploy: "2026-11-01T08:00:00Z",
       deployState: "deploy success",
+      url: "https://a1b2c3.site.pages.dev",
     });
   });
 

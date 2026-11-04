@@ -15,6 +15,7 @@ describe("vercel", () => {
       status: "Up",
       lastDeploy: "2026-10-31T08:40:00.000Z",
       deployState: "READY",
+      url: "https://project-a-abc123.vercel.app",
     });
     const url = new URL(calls[0]?.url ?? "");
     expect(url.searchParams.get("projectId")).toBe("prj_1");

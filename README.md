@@ -20,12 +20,26 @@ inkling only touches the properties it owns, and only on rows with Monitor ticke
 
 ## Notion properties
 
-You own Name, Provider (select), Resource ID (text) and Monitor (checkbox).
-inkling owns Status, Last deploy, Deploy state, Usage, Usage note, Last checked and Error, and `pnpm setup:notion` creates them for you.
+You own Name, Provider, Resource ID and Monitor (checkbox).
+Provider and Resource ID can be select or text columns, or text formulas, for example derived from a relation.
+
+inkling owns these and fills every one on each write, so none stays empty:
+
+| Property     | Type                                             | When there is nothing to report                     |
+| ------------ | ------------------------------------------------ | --------------------------------------------------- |
+| Status       | status, with options Up, Degraded, Down, Unknown | Unknown                                             |
+| URL          | url                                              | a dashboard or repo link built from the Resource ID |
+| Last deploy  | date                                             | copies Last checked                                 |
+| Deploy state | text                                             | No deploys                                          |
+| Last checked | date                                             | always set, at most once an hour per row            |
+| Error        | text                                             | None                                                |
+
+`pnpm setup:notion` creates every inkling column except Status, because the Notion API cannot create status properties.
+Create Status by hand with the four options above.
 
 ## Setup
 
-1. Create a Notion internal connection with read and update content, and share only your services database with it.
+1. Create a Notion internal connection with read and update content, and share your services database with it, plus any database its Provider or Resource ID formulas read through relations.
 2. Clone this repo and run `pnpm install`.
 3. Copy `.dev.vars.example` to `.dev.vars` and fill in `NOTION_TOKEN`, `NOTION_DATA_SOURCE_ID` and the provider tokens you use. See [SECURITY.md](SECURITY.md) for scopes.
 4. Run `pnpm setup:notion` to add the inkling-owned properties to the data source.
@@ -73,7 +87,6 @@ curl -X POST https://inkling.<subdomain>.workers.dev/refresh \
 - Workers Free allows 10 ms of CPU per run; time spent waiting on `fetch` does not count.
 - Notion writes are spaced to 3 per second, and Last checked is written at most once an hour per row.
 - KV is written once per run for the round-robin cursor and once per provider when a snapshot changes, well under the Free daily write cap.
-- Usage and Usage note are wired through but no v1 adapter fills them yet.
 - inkling is a board, not a pager.
   Keep UptimeRobot or a similar service for real time downtime alerts.
 

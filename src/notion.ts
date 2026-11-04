@@ -32,11 +32,16 @@ export function notionClient(env: Env): Client {
   });
 }
 
-/** Reads a title, rich text or select property as plain text. */
+/**
+ * Reads a title, rich text, select or text formula property as plain text.
+ *
+ * Formulas let Provider and Resource ID be derived from relations instead of typed by hand.
+ */
 function text(prop: PageObjectResponse["properties"][string] | undefined): string {
   if (prop?.type === "title") return prop.title.map((t) => t.plain_text).join("");
   if (prop?.type === "rich_text") return prop.rich_text.map((t) => t.plain_text).join("");
   if (prop?.type === "select") return prop.select?.name ?? "";
+  if (prop?.type === "formula" && prop.formula.type === "string") return prop.formula.string ?? "";
   return "";
 }
 
@@ -100,19 +105,24 @@ export async function retrieveRow(
 }
 
 /** Notion caps a rich text item at 2000 characters. */
-function richText(value: string | undefined) {
-  return { rich_text: value ? [{ text: { content: value.slice(0, 2000) } }] : [] };
+function richText(value: string) {
+  return { rich_text: [{ text: { content: value.slice(0, 2000) } }] };
 }
 
-/** Maps a Check onto inkling-owned properties; Last checked is only sent when `checkedAt` is given. */
+/**
+ * Maps a Check onto inkling-owned properties, filling defaults so no column is ever left empty.
+ *
+ * Last checked is only sent when `checkedAt` is given.
+ * Without a known deploy, Last deploy copies Last checked and Deploy state says so, rather than leaving a blank date.
+ */
 export function toProperties(check: Check, checkedAt?: string): UpdatePageParameters["properties"] {
+  const lastDeploy = check.lastDeploy ?? checkedAt;
   return {
-    Status: { select: { name: check.status } },
-    "Last deploy": { date: check.lastDeploy ? { start: check.lastDeploy } : null },
-    "Deploy state": richText(check.deployState),
-    Usage: { number: check.usage ?? null },
-    "Usage note": richText(check.usageNote),
-    Error: richText(check.error),
+    Status: { status: { name: check.status } },
+    URL: { url: check.url ?? null },
+    "Deploy state": richText(check.deployState ?? "No deploys"),
+    Error: richText(check.error ?? "None"),
+    ...(lastDeploy && { "Last deploy": { date: { start: lastDeploy } } }),
     ...(checkedAt && { "Last checked": { date: { start: checkedAt } } }),
   };
 }

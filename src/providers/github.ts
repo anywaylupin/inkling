@@ -21,6 +21,7 @@ function runStatus(run: Run | undefined): Status {
  */
 export const github: Provider = {
   id: "github",
+  link: (repo) => `https://github.com/${repo}`,
   async check(repo, env) {
     if (!env.GITHUB_TOKEN) return missingSecret("GITHUB_TOKEN");
     if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {

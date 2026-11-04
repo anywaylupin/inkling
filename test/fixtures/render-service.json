@@ -1,1 +1,7 @@
-{ "id": "srv-abc", "name": "api", "type": "web_service", "suspended": "not_suspended" }
+{
+  "id": "srv-abc",
+  "name": "api",
+  "type": "web_service",
+  "suspended": "not_suspended",
+  "serviceDetails": { "url": "https://api.onrender.com" }
+}

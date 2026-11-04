@@ -53,8 +53,12 @@ describe("run", () => {
     let written = await patches(calls);
     expect(written).toHaveLength(1);
     expect(written[0]?.page).toBe("page-http");
-    expect(written[0]?.properties).toMatchObject({
-      Status: { select: { name: "Up" } },
+    expect(written[0]?.properties).toEqual({
+      Status: { status: { name: "Up" } },
+      URL: { url: "https://example.com" },
+      "Deploy state": { rich_text: [{ text: { content: "No deploys" } }] },
+      Error: { rich_text: [{ text: { content: "None" } }] },
+      "Last deploy": { date: { start: t0.toISOString() } },
       "Last checked": { date: { start: t0.toISOString() } },
     });
     expect(await testEnv.INKLING_STATE.get("cursor")).toBe("http");
@@ -77,7 +81,7 @@ describe("run", () => {
     await run(testEnv, new Date(t0.getTime() + 45 * 60 * 1000));
     written = await patches(calls);
     expect(written).toHaveLength(1);
-    expect(written[0]?.properties).toMatchObject({ Status: { select: { name: "Down" } } });
+    expect(written[0]?.properties).toMatchObject({ Status: { status: { name: "Down" } } });
     expect(written[0]?.properties).not.toHaveProperty("Last checked");
     const alert = calls.find((c) => c.url.includes("ntfy.sh"));
     expect(await alert?.text()).toBe("Landing page is Down, was Up");
@@ -96,7 +100,8 @@ describe("run", () => {
     expect(log.mock.calls).toEqual([["github check failed: HTTP 502"]]);
     const [written] = await patches(calls);
     expect(written?.properties).toMatchObject({
-      Status: { select: { name: "Unknown" } },
+      Status: { status: { name: "Unknown" } },
+      URL: { url: "https://github.com/acme/site" },
       Error: { rich_text: [{ text: { content: "Check failed: HTTP 502" } }] },
     });
   });

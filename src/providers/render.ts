@@ -15,12 +15,16 @@ interface Deploy {
  */
 export const render: Provider = {
   id: "render",
+  link: (serviceId) => `https://dashboard.render.com/web/${encodeURIComponent(serviceId)}`,
   async check(serviceId, env) {
     if (!env.RENDER_API_KEY) return missingSecret("RENDER_API_KEY");
     const id = encodeURIComponent(serviceId);
     const headers = { authorization: `Bearer ${env.RENDER_API_KEY}`, accept: "application/json" };
     const [service, deploys] = await Promise.all([
-      getJson<{ suspended: string }>(`${API}/services/${id}`, headers),
+      getJson<{ suspended: string; serviceDetails?: { url?: string } }>(
+        `${API}/services/${id}`,
+        headers,
+      ),
       getJson<{ deploy: Deploy }[]>(`${API}/services/${id}/deploys?limit=1`, headers),
     ]);
     const deploy = deploys[0]?.deploy;
@@ -29,6 +33,7 @@ export const render: Provider = {
       status: service.suspended === "suspended" ? "Down" : failed ? "Degraded" : "Up",
       lastDeploy: deploy ? (deploy.finishedAt ?? deploy.createdAt) : undefined,
       deployState: deploy?.status,
+      url: service.serviceDetails?.url,
     };
   },
 };

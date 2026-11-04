@@ -44,7 +44,7 @@ describe("refresh", () => {
     expect(patch?.url).toContain(`/v1/pages/${PAGE_ID}`);
     const body = await patch?.json<{ properties: Record<string, unknown> }>();
     expect(body?.properties).toMatchObject({
-      Status: { select: { name: "Up" } },
+      Status: { status: { name: "Up" } },
       "Last checked": { date: {} },
     });
     const snapshots = await env.INKLING_STATE.get<Record<string, unknown>>("snapshot:http", "json");
@@ -63,6 +63,31 @@ describe("refresh", () => {
     const ctx = createExecutionContext();
     expect((await handleRefresh(request, env, ctx)).status).toBe(202);
     await waitOnExecutionContext(ctx);
+  });
+
+  it("reads Provider and Resource ID from formula columns", async () => {
+    const formulas = {
+      ...page(),
+      properties: {
+        ...page().properties,
+        Provider: { id: "p", type: "formula", formula: { type: "string", string: "github" } },
+        "Resource ID": {
+          id: "r",
+          type: "formula",
+          formula: { type: "string", string: "acme/site" },
+        },
+      },
+    };
+    mockFetch(() => Response.json(formulas));
+    const res = await handleRefresh(
+      webhook(),
+      { ...env, GITHUB_TOKEN: undefined },
+      {
+        ...createExecutionContext(),
+        waitUntil: () => {},
+      },
+    );
+    expect(await res.json()).toEqual({ refreshing: PAGE_ID, provider: "github" });
   });
 
   it("rejects a wrong key without calling Notion", async () => {
