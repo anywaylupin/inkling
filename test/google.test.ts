@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { googleanalytics, googlecloud, googlegemini } from "../src/providers/google";
 import cloudRun from "./fixtures/cloudrun-service.json";
 import summaries from "./fixtures/ga-account-summaries.json";
+import streams from "./fixtures/ga-data-streams.json";
 import report from "./fixtures/ga-report.json";
 import models from "./fixtures/gemini-models.json";
 import { mockFetch, routes, testEnv } from "./helpers";
@@ -60,7 +61,7 @@ describe("googlecloud", () => {
       status: "Up",
       lastDeploy: "2026-11-02T07:30:00.000000Z",
       deployState: "api-00042-xyz",
-      url: "https://api-abc123-uc.a.run.app",
+      domain: "https://api-abc123-uc.a.run.app",
     });
 
     const assertion = new URLSearchParams(await calls[0]?.text()).get("assertion") ?? "";
@@ -95,10 +96,15 @@ describe("googlecloud", () => {
 
 describe("googleanalytics", () => {
   it("is Up when the property recorded events, finding it by display name", async () => {
-    const calls = google({ "/accountSummaries": summaries, ":runReport": report });
+    const calls = google({
+      "/accountSummaries": summaries,
+      "/dataStreams": streams,
+      ":runReport": report,
+    });
     expect(await googleanalytics.check("project-a", env)).toEqual({
       status: "Up",
-      url: "https://analytics.google.com/analytics/web/#/p987654321/reports/intelligenthome",
+      deployment: "https://analytics.google.com/analytics/web/#/p987654321/reports/intelligenthome",
+      domain: "https://acme.dev",
     });
     expect(calls.at(-1)?.url).toContain("/properties/987654321:runReport");
   });

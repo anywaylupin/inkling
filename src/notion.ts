@@ -123,7 +123,8 @@ export function toProperties(check: Check, checkedAt?: string): UpdatePageParame
   const lastDeploy = check.lastDeploy ?? checkedAt;
   return {
     Status: { status: { name: check.status } },
-    URL: { url: check.url ?? null },
+    Deployment: { url: check.deployment ?? null },
+    Domain: { url: check.domain ?? null },
     "Deploy state": richText(check.deployState ?? "No deploys"),
     Error: richText(check.error ?? "None", check.errorLink),
     ...(lastDeploy && { "Last deploy": { date: { start: lastDeploy } } }),

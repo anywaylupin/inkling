@@ -14,6 +14,8 @@ describe("github", () => {
       status: "Up",
       lastDeploy: "2026-10-30T09:12:00Z",
       deployState: "v1.2.0",
+      deployment: "https://github.com/acme/site/actions/runs/101",
+      domain: "https://acme.dev",
     });
     const runsUrl = new URL(calls.find((c) => c.url.includes("/actions/runs"))?.url ?? "");
     expect(runsUrl.searchParams.get("branch")).toBe("main");
@@ -23,7 +25,7 @@ describe("github", () => {
   it("is Down when the latest run failed and tolerates a repo without releases", async () => {
     const failed = { workflow_runs: [{ ...runs.workflow_runs[0], conclusion: "failure" }] };
     mockFetch(routes({ "/actions/runs": failed, "/repos/acme/site": repo }));
-    expect(await github.check("acme/site", testEnv)).toEqual({ status: "Down" });
+    expect(await github.check("acme/site", testEnv)).toMatchObject({ status: "Down" });
   });
 
   it("is Unknown without a token", async () => {

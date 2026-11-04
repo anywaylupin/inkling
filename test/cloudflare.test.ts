@@ -1,16 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { cloudflare } from "../src/providers/cloudflare";
 import pages from "./fixtures/cloudflare-pages-deployments.json";
+import subdomain from "./fixtures/cloudflare-subdomain.json";
 import workers from "./fixtures/cloudflare-worker-deployments.json";
 import { mockFetch, routes, testEnv } from "./helpers";
 
 describe("cloudflare", () => {
   it("reads the latest Worker deployment", async () => {
-    const calls = mockFetch(routes({ "/workers/scripts/api/deployments": workers }));
+    const calls = mockFetch(
+      routes({ "/workers/scripts/api/deployments": workers, "/workers/subdomain": subdomain }),
+    );
     expect(await cloudflare.check("api", testEnv)).toEqual({
       status: "Up",
       lastDeploy: "2026-10-31T14:02:11.123Z",
       deployState: "Deployed via wrangler",
+      domain: "https://api.acme.workers.dev",
     });
     expect(calls[0]?.headers.get("authorization")).toBe("Bearer test-cloudflare");
   });
@@ -21,7 +25,7 @@ describe("cloudflare", () => {
       status: "Up",
       lastDeploy: "2026-11-01T08:00:00Z",
       deployState: "deploy success",
-      url: "https://a1b2c3.site.pages.dev",
+      deployment: "https://dash.cloudflare.com/acct-1/pages/view/site/p1",
     });
   });
 

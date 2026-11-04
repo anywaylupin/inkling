@@ -2,6 +2,7 @@
   "deployments": [
     {
       "uid": "dpl_1",
+      "inspectorUrl": "https://vercel.com/acme/project-a/dpl1",
       "target": "production",
       "url": "project-a-abc123.vercel.app",
       "state": "READY",
@@ -9,5 +10,9 @@
       "created": 1793436000000
     }
   ],
-  "pagination": { "count": 1, "next": null, "prev": null }
+  "pagination": {
+    "count": 1,
+    "next": null,
+    "prev": null
+  }
 }

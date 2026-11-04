@@ -35,14 +35,15 @@ Provider and Resource ID can be select or text columns, or text formulas, for ex
 
 inkling owns these and fills every one on each write, so none stays empty:
 
-| Property     | Type                                             | When there is nothing to report                     |
-| ------------ | ------------------------------------------------ | --------------------------------------------------- |
-| Status       | status, with options Up, Degraded, Down, Unknown | Unknown                                             |
-| URL          | url                                              | a dashboard or repo link built from the Resource ID |
-| Last deploy  | date                                             | copies Last checked                                 |
-| Deploy state | text                                             | No deploys                                          |
-| Last checked | date                                             | always set, at most once an hour per row            |
-| Error        | text                                             | None                                                |
+| Property     | Type                                             | When there is nothing to report                                                 |
+| ------------ | ------------------------------------------------ | ------------------------------------------------------------------------------- |
+| Status       | status, with options Up, Degraded, Down, Unknown | Unknown                                                                         |
+| Deployment   | url                                              | the latest deploy's page, or the console page when the provider has no deploys  |
+| Domain       | url                                              | the public address: production domain, service or function URL, or the API host |
+| Last deploy  | date                                             | copies Last checked                                                             |
+| Deploy state | text                                             | No deploys                                                                      |
+| Last checked | date                                             | always set, at most once an hour per row                                        |
+| Error        | text                                             | None                                                                            |
 
 `pnpm setup:notion` creates every inkling column except Status, because the Notion API cannot create status properties.
 Create Status by hand with the four options above.
@@ -91,7 +92,7 @@ curl -X POST https://inkling.<subdomain>.workers.dev/refresh \
 
 - Workers Free allows 50 subrequests per run.
   Each run takes providers in round-robin order until their rows would cost more than 40, counting each row as its provider's calls plus one Notion write.
-  A GitHub or Google Analytics row costs 4, an http, Render, Neon or Cloud Run row 3, every other row 2.
+  A Google Analytics row costs 5, a GitHub row 4, an http, Cloudflare, Vercel, Render, Neon, Lambda or Cloud Run row 3, every other row 2.
   A provider with more rows than the budget still gets a whole run to itself, so keep under about 12 GitHub rows.
 - New cron triggers can take about 15 minutes to start firing after a deploy.
 - Workers Free allows 10 ms of CPU per run; time spent waiting on `fetch` does not count.

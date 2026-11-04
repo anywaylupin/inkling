@@ -5,6 +5,7 @@ export const mistral: Provider = {
   id: "mistral",
   cost: 1,
   link: () => "https://console.mistral.ai/usage",
+  domain: () => "https://api.mistral.ai",
   async check(_resourceId, env) {
     if (!env.MISTRAL_API_KEY) return missingSecret("MISTRAL_API_KEY");
     await getJson("https://api.mistral.ai/v1/models", {

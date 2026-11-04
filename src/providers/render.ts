@@ -3,6 +3,7 @@ import { getJson, missingSecret, type Provider } from "./types";
 const API = "https://api.render.com/v1";
 
 interface Deploy {
+  id: string;
   status: string;
   createdAt: string;
   finishedAt?: string | null;
@@ -34,7 +35,8 @@ export const render: Provider = {
       status: service.suspended === "suspended" ? "Down" : failed ? "Degraded" : "Up",
       lastDeploy: deploy ? (deploy.finishedAt ?? deploy.createdAt) : undefined,
       deployState: deploy?.status,
-      url: service.serviceDetails?.url,
+      deployment: deploy && `https://dashboard.render.com/web/${id}/deploys/${deploy.id}`,
+      domain: service.serviceDetails?.url,
     };
   },
 };

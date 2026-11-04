@@ -1,0 +1,5 @@
+{
+  "dataStreams": [
+    { "type": "WEB_DATA_STREAM", "webStreamData": { "defaultUri": "https://acme.dev" } }
+  ]
+}

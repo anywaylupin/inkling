@@ -12,7 +12,8 @@ describe("neon", () => {
     expect(await neon.check("project-a", { ...testEnv, NEON_API_KEY: "test-neon" })).toEqual({
       status: "Up",
       deployState: "Compute idle",
-      url: "https://console.neon.tech/app/projects/wispy-lake-123456",
+      deployment: "https://console.neon.tech/app/projects/wispy-lake-123456",
+      domain: "postgresql://ep-cool-1.us-east-2.aws.neon.tech",
     });
     expect(calls[0]?.url).toContain("search=project-a");
     expect(calls[1]?.url).toContain("/projects/wispy-lake-123456/endpoints");

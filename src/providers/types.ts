@@ -21,7 +21,9 @@ export type ProviderId = (typeof PROVIDER_IDS)[number];
 export type Status = "Up" | "Degraded" | "Down" | "Unknown";
 
 /**
- * One provider's verdict on one row; `url` is the live URL when the API reports one.
+ * One provider's verdict on one row.
+ *
+ * `deployment` links to the latest deploy's page and `domain` is the public address, each when the API reports one.
  *
  * `errorLink` turns the end of the Error text into a link, such as where to create a missing token.
  */
@@ -29,7 +31,8 @@ export interface Check {
   status: Status;
   lastDeploy?: string;
   deployState?: string;
-  url?: string;
+  deployment?: string;
+  domain?: string;
   error?: string;
   errorLink?: string;
 }
@@ -39,8 +42,10 @@ export interface Provider {
   /** Worst-case subrequests one row costs, so a run can fit as many providers as the Free plan cap allows. */
   cost: number;
   check(resourceId: string, env: Env): Promise<Check>;
-  /** A URL built without any API call, used when the check fails or reports no live URL. */
+  /** A dashboard URL built without any API call; fills Deployment when the check reports none. */
   link(resourceId: string, env: Env): string;
+  /** A public address built without any API call; fills Domain when the check reports none, else `link` does. */
+  domain?(resourceId: string, env: Env): string;
 }
 
 /** Where to create each secret; a missing one shows this link in the Error column. */

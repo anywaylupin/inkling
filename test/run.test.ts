@@ -77,7 +77,8 @@ describe("run", () => {
     expect(await testEnv.INKLING_STATE.get("cursor")).toBe("github");
     expect(written[0]?.properties).toEqual({
       Status: { status: { name: "Up" } },
-      URL: { url: "https://example.com" },
+      Deployment: { url: "https://example.com" },
+      Domain: { url: "https://example.com" },
       "Deploy state": { rich_text: [{ text: { content: "No deploys" } }] },
       Error: { rich_text: [{ text: { content: "None" } }] },
       "Last deploy": { date: { start: t0.toISOString() } },
@@ -114,7 +115,8 @@ describe("run", () => {
     const [written] = await patches(calls);
     expect(written?.properties).toMatchObject({
       Status: { status: { name: "Unknown" } },
-      URL: { url: "https://github.com/acme/site" },
+      Deployment: { url: "https://github.com/acme/site/actions" },
+      Domain: { url: "https://github.com/acme/site" },
       Error: { rich_text: [{ text: { content: "Check failed: HTTP 502" } }] },
     });
   });

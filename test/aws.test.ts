@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { dynamodb, lambda } from "../src/providers/aws";
 import table from "./fixtures/dynamodb-table.json";
+import functionUrl from "./fixtures/lambda-function-url.json";
 import fn from "./fixtures/lambda-function.json";
-import { mockFetch, testEnv } from "./helpers";
+import { mockFetch, routes, testEnv } from "./helpers";
 
 const env = {
   ...testEnv,
@@ -25,6 +26,13 @@ describe("lambda", () => {
     expect(calls[0]?.headers.get("authorization")).toMatch(
       /^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/,
     );
+  });
+
+  it("uses the function URL as Domain when one is configured", async () => {
+    mockFetch(routes({ "/url": functionUrl, "/functions/resize-images": fn }));
+    expect(await lambda.check("resize-images", env)).toMatchObject({
+      domain: "https://abc123.lambda-url.us-east-1.on.aws/",
+    });
   });
 
   it("takes the region from an ARN", async () => {

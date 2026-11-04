@@ -1,6 +1,13 @@
 import { AwsClient } from "aws4fetch";
 import type { Env } from "../env";
-import { ApiError, missingSecret, type Check, type Provider, type Status } from "./types";
+import {
+  ApiError,
+  missingSecret,
+  orNotFound,
+  type Check,
+  type Provider,
+  type Status,
+} from "./types";
 
 /** Region from an ARN such as `arn:aws:lambda:us-east-1:123:function:name`, else AWS_REGION. */
 function regionOf(resourceId: string, env: Env): string | undefined {
@@ -68,10 +75,11 @@ interface LambdaFunction {
  * Reads a function name or ARN with GetFunction.
  *
  * Inactive counts as Up because AWS parks unused functions and wakes them on the next call.
+ * Domain is the function URL when one is configured; a 404 there just means none.
  */
 export const lambda: Provider = {
   id: "lambda",
-  cost: 1,
+  cost: 2,
   link: (resourceId, env) =>
     consoleUrl(
       resourceId,
@@ -82,12 +90,21 @@ export const lambda: Provider = {
     const missing = missingAws(resourceId, env);
     if (missing) return missing;
     const region = regionOf(resourceId, env);
-    const { Configuration: config } = await awsJson<LambdaFunction>(
-      env,
-      "lambda",
-      resourceId,
-      `https://lambda.${region}.amazonaws.com/2015-03-31/functions/${encodeURIComponent(resourceId)}`,
-    );
+    const name = encodeURIComponent(resourceId);
+    const [{ Configuration: config }, functionUrl] = await Promise.all([
+      awsJson<LambdaFunction>(
+        env,
+        "lambda",
+        resourceId,
+        `https://lambda.${region}.amazonaws.com/2015-03-31/functions/${name}`,
+      ),
+      awsJson<{ FunctionUrl: string }>(
+        env,
+        "lambda",
+        resourceId,
+        `https://lambda.${region}.amazonaws.com/2021-10-31/functions/${name}/url`,
+      ).catch(orNotFound),
+    ]);
     const state = config.State ?? "Active";
     const update = config.LastUpdateStatus ?? "Successful";
     const status: Status =
@@ -100,6 +117,7 @@ export const lambda: Provider = {
       status,
       lastDeploy: lambdaDate(config.LastModified),
       deployState: `${state}, last update ${update}`,
+      domain: functionUrl?.FunctionUrl,
     };
   },
 };
@@ -122,6 +140,8 @@ export const dynamodb: Provider = {
       env,
       `dynamodbv2/home?region={region}#table?name=${encodeURIComponent(nameOf(resourceId))}`,
     ),
+  domain: (resourceId, env) =>
+    `https://dynamodb.${regionOf(resourceId, env) ?? "us-east-1"}.amazonaws.com`,
   async check(resourceId, env) {
     const missing = missingAws(resourceId, env);
     if (missing) return missing;

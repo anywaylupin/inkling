@@ -13,7 +13,8 @@ export const STATUS_OPTIONS = ["Up", "Degraded", "Down", "Unknown"];
  * This file has only type imports so `pnpm setup:notion` can load it with plain Node.
  */
 export const INKLING_PROPERTIES = {
-  URL: { url: {} },
+  Deployment: { url: {} },
+  Domain: { url: {} },
   "Last deploy": { date: {} },
   "Deploy state": { rich_text: {} },
   "Last checked": { date: {} },

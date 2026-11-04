@@ -1,0 +1,1 @@
+{ "name": "project-a", "targets": { "production": { "alias": ["project-a.acme.dev"] } } }

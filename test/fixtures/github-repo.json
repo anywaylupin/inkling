@@ -1,1 +1,6 @@
-{ "id": 1, "full_name": "acme/site", "default_branch": "main" }
+{
+  "id": 1,
+  "full_name": "acme/site",
+  "default_branch": "main",
+  "homepage": "https://acme.dev"
+}

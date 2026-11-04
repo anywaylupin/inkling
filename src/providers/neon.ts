@@ -20,15 +20,17 @@ export const neon: Provider = {
     );
     const project = projects.find((p) => p.id === resourceId || p.name === resourceId);
     if (!project) return { status: "Unknown", error: `No Neon project named ${resourceId}` };
-    const { endpoints } = await getJson<{ endpoints: { current_state: string }[] }>(
+    const { endpoints } = await getJson<{ endpoints: { current_state: string; host: string }[] }>(
       `${API}/projects/${project.id}/endpoints`,
       headers,
     );
     const states = endpoints.map((e) => e.current_state);
+    const host = endpoints[0]?.host;
     return {
       status: states.length > 0 ? "Up" : "Degraded",
       deployState: states.length > 0 ? `Compute ${states.join(", ")}` : "No compute endpoint",
-      url: `https://console.neon.tech/app/projects/${project.id}`,
+      deployment: `https://console.neon.tech/app/projects/${project.id}`,
+      domain: host && `postgresql://${host}`,
     };
   },
 };

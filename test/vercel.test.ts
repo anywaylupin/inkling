@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { vercel } from "../src/providers/vercel";
+import project from "./fixtures/vercel-project.json";
 import fixture from "./fixtures/vercel-deployments.json";
 import { mockFetch, routes, testEnv } from "./helpers";
 
@@ -10,12 +11,13 @@ function withState(state: string) {
 
 describe("vercel", () => {
   it("is Up when the latest production deployment is READY", async () => {
-    const calls = mockFetch(routes({ "/v6/deployments": fixture }));
+    const calls = mockFetch(routes({ "/v6/deployments": fixture, "/v9/projects/prj_1": project }));
     expect(await vercel.check("prj_1", testEnv)).toEqual({
       status: "Up",
       lastDeploy: "2026-10-31T08:40:00.000Z",
       deployState: "READY",
-      url: "https://project-a-abc123.vercel.app",
+      deployment: "https://vercel.com/acme/project-a/dpl1",
+      domain: "https://project-a.acme.dev",
     });
     const url = new URL(calls[0]?.url ?? "");
     expect(url.searchParams.get("projectId")).toBe("prj_1");
@@ -27,12 +29,12 @@ describe("vercel", () => {
     ["BUILDING", "Degraded"],
     ["CANCELED", "Unknown"],
   ])("maps %s to %s", async (state, status) => {
-    mockFetch(routes({ "/v6/deployments": withState(state) }));
+    mockFetch(routes({ "/v6/deployments": withState(state), "/v9/projects/prj_1": project }));
     expect((await vercel.check("prj_1", testEnv)).status).toBe(status);
   });
 
   it("is Unknown when there are no production deployments", async () => {
-    mockFetch(routes({ "/v6/deployments": { deployments: [] } }));
+    mockFetch(routes({ "/v6/deployments": { deployments: [] }, "/v9/projects/prj_1": project }));
     expect((await vercel.check("prj_1", testEnv)).status).toBe("Unknown");
   });
 

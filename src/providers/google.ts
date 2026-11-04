@@ -101,10 +101,11 @@ function analyticsLink(propertyId: string): string {
  * Reads a GA4 property id, or a property display name looked up through the Admin API.
  *
  * Up means the property recorded events since yesterday, which catches a broken tracking tag.
+ * Domain is the first web data stream's site URL; a failed stream lookup only loses Domain, never the check.
  */
 export const googleanalytics: Provider = {
   id: "googleanalytics",
-  cost: 3,
+  cost: 4,
   link: analyticsLink,
   async check(resourceId, env) {
     const account = serviceAccount(env);
@@ -128,6 +129,10 @@ export const googleanalytics: Provider = {
       }
       propertyId = match.property.replace("properties/", "");
     }
+    const streams = getJson<{ dataStreams?: { webStreamData?: { defaultUri?: string } }[] }>(
+      `https://analyticsadmin.googleapis.com/v1beta/properties/${propertyId}/dataStreams`,
+      headers,
+    ).catch(() => ({ dataStreams: [] }));
     const res = await fetch(
       `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
       {
@@ -145,9 +150,14 @@ export const googleanalytics: Provider = {
     }
     const report = await res.json<{ rows?: { metricValues: { value: string }[] }[] }>();
     const events = Number.parseInt(report.rows?.[0]?.metricValues[0]?.value ?? "0", 10);
+    const { dataStreams = [] } = await streams;
+    const links = {
+      deployment: analyticsLink(propertyId),
+      domain: dataStreams.find((s) => s.webStreamData?.defaultUri)?.webStreamData?.defaultUri,
+    };
     return events > 0
-      ? { status: "Up", url: analyticsLink(propertyId) }
-      : { status: "Down", error: "No events since yesterday", url: analyticsLink(propertyId) };
+      ? { status: "Up", ...links }
+      : { status: "Down", error: "No events since yesterday", ...links };
   },
 };
 
@@ -170,7 +180,7 @@ export const googlecloud: Provider = {
       ? resourceId.split("/")
       : [env.GCP_REGION ?? "us-central1", resourceId];
     const project = serviceAccount(env)?.project_id ?? "";
-    return `https://console.cloud.google.com/run/detail/${region}/${service}/metrics?project=${project}`;
+    return `https://console.cloud.google.com/run/detail/${region}/${service}/revisions?project=${project}`;
   },
   async check(resourceId, env) {
     const account = serviceAccount(env);
@@ -196,7 +206,7 @@ export const googlecloud: Provider = {
       status: RUN_STATES[state] ?? "Unknown",
       lastDeploy: run.updateTime,
       deployState: run.latestReadyRevision?.split("/").at(-1) ?? state,
-      url: run.uri,
+      domain: run.uri,
     };
   },
 };
@@ -206,6 +216,7 @@ export const googlegemini: Provider = {
   id: "googlegemini",
   cost: 1,
   link: () => "https://aistudio.google.com/usage",
+  domain: () => "https://generativelanguage.googleapis.com",
   async check(_resourceId, env) {
     if (!env.GEMINI_API_KEY) return missingSecret("GEMINI_API_KEY");
     await getJson("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1", {

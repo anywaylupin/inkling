@@ -6,7 +6,8 @@
       "name": "CI",
       "head_branch": "main",
       "status": "completed",
-      "conclusion": "success"
+      "conclusion": "success",
+      "html_url": "https://github.com/acme/site/actions/runs/101"
     }
   ]
 }

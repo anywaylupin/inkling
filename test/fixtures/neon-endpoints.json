@@ -1,1 +1,9 @@
-{ "endpoints": [{ "id": "ep-cool-1", "current_state": "idle" }] }
+{
+  "endpoints": [
+    {
+      "id": "ep-cool-1",
+      "current_state": "idle",
+      "host": "ep-cool-1.us-east-2.aws.neon.tech"
+    }
+  ]
+}

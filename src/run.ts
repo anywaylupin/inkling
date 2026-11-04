@@ -8,7 +8,14 @@ import { throttle } from "./throttle";
 const HOUR_MS = 60 * 60 * 1000;
 
 /** Fields whose change triggers a Notion write. */
-const DIFF_FIELDS = ["status", "lastDeploy", "deployState", "url", "error"] as const;
+const DIFF_FIELDS = [
+  "status",
+  "lastDeploy",
+  "deployState",
+  "deployment",
+  "domain",
+  "error",
+] as const;
 
 /** What the last run wrote for one row, keyed by page id inside each provider's KV entry. */
 type Snapshot = Pick<Check, (typeof DIFF_FIELDS)[number]> & { checkedAt: string };
@@ -22,7 +29,7 @@ export function nextProvider(present: ProviderId[], last: string | null): Provid
 /**
  * Runs one adapter and turns any throw into an Unknown row, logging the provider id and error code only.
  *
- * The provider's static link fills URL whenever the check has none, so the column is never empty.
+ * The provider's static links fill Deployment and Domain whenever the check has none, so neither column is ever empty.
  */
 async function safeCheck(row: Row, env: Env): Promise<Check> {
   const provider = providers[row.provider];
@@ -35,7 +42,12 @@ async function safeCheck(row: Row, env: Env): Promise<Check> {
     console.error(`${row.provider} check failed: ${code}`);
     check = { status: "Unknown", error: `Check failed: ${code}` };
   }
-  return { ...check, url: check.url ?? provider.link(row.resourceId, env) };
+  const link = provider.link(row.resourceId, env);
+  return {
+    ...check,
+    deployment: check.deployment ?? link,
+    domain: check.domain ?? provider.domain?.(row.resourceId, env) ?? link,
+  };
 }
 
 /** Posts a status change to the ntfy topic; the row name stays in the body because headers must be Latin-1. */
@@ -92,8 +104,8 @@ async function updateRow(
     }
   }
   if (prev && prev.status !== check.status) await alert(env, row, prev.status, check.status);
-  const { status, lastDeploy, deployState, url, error } = check;
-  return { status, lastDeploy, deployState, url, error, checkedAt };
+  const { status, lastDeploy, deployState, deployment, domain, error } = check;
+  return { status, lastDeploy, deployState, deployment, domain, error, checkedAt };
 }
 
 /** Reads one provider's snapshots from KV. */
