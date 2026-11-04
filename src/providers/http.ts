@@ -24,6 +24,7 @@ async function probe(url: string): Promise<{ code: number; ms: number }> {
  */
 export const http: Provider = {
   id: "http",
+  cost: 2,
   link: (url) => url,
   async check(url): Promise<Check> {
     if (!/^https?:\/\//.test(url)) {

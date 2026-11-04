@@ -12,6 +12,15 @@ export interface Env {
   CF_ACCOUNT_ID?: string;
   VERCEL_TOKEN?: string;
   RENDER_API_KEY?: string;
+  NEON_API_KEY?: string;
+  AWS_ACCESS_KEY_ID?: string;
+  AWS_SECRET_ACCESS_KEY?: string;
+  AWS_REGION?: string;
+  MISTRAL_API_KEY?: string;
+  GEMINI_API_KEY?: string;
+  /** The full JSON key file of a Google service account. */
+  GCP_SA_KEY?: string;
+  GCP_REGION?: string;
   ALERT_URL?: string;
   REFRESH_SECRET?: string;
 }

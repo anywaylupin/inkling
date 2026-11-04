@@ -35,6 +35,6 @@ describe("cloudflare", () => {
 
   it("is Unknown without the account id", async () => {
     const result = await cloudflare.check("api", { ...testEnv, CF_ACCOUNT_ID: undefined });
-    expect(result).toEqual({ status: "Unknown", error: "CF_ACCOUNT_ID is not set" });
+    expect(result).toMatchObject({ status: "Unknown", error: "CF_ACCOUNT_ID is not set." });
   });
 });

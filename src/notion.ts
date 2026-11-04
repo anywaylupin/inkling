@@ -104,9 +104,13 @@ export async function retrieveRow(
   }
 }
 
-/** Notion caps a rich text item at 2000 characters. */
-function richText(value: string) {
-  return { rich_text: [{ text: { content: value.slice(0, 2000) } }] };
+/** Notion caps a rich text item at 2000 characters; `link` appends a clickable "How to get it". */
+function richText(value: string, link?: string) {
+  const items: { text: { content: string; link?: { url: string } } }[] = [
+    { text: { content: value.slice(0, 2000) } },
+  ];
+  if (link) items.push({ text: { content: " How to get it", link: { url: link } } });
+  return { rich_text: items };
 }
 
 /**
@@ -121,7 +125,7 @@ export function toProperties(check: Check, checkedAt?: string): UpdatePageParame
     Status: { status: { name: check.status } },
     URL: { url: check.url ?? null },
     "Deploy state": richText(check.deployState ?? "No deploys"),
-    Error: richText(check.error ?? "None"),
+    Error: richText(check.error ?? "None", check.errorLink),
     ...(lastDeploy && { "Last deploy": { date: { start: lastDeploy } } }),
     ...(checkedAt && { "Last checked": { date: { start: checkedAt } } }),
   };

@@ -28,7 +28,7 @@ describe("github", () => {
 
   it("is Unknown without a token", async () => {
     const result = await github.check("acme/site", { ...testEnv, GITHUB_TOKEN: undefined });
-    expect(result).toEqual({ status: "Unknown", error: "GITHUB_TOKEN is not set" });
+    expect(result).toMatchObject({ status: "Unknown", error: "GITHUB_TOKEN is not set." });
   });
 
   it("rejects a Resource ID that is not owner/repo", async () => {

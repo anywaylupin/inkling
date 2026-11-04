@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { nextProvider, run } from "../src/run";
+import { toProperties } from "../src/notion";
+import { nextProvider, pickProviders, run } from "../src/run";
 import release from "./fixtures/github-release.json";
 import repo from "./fixtures/github-repo.json";
 import runs from "./fixtures/github-runs.json";
@@ -43,16 +44,37 @@ describe("nextProvider", () => {
   });
 });
 
+describe("pickProviders", () => {
+  it("takes providers after the cursor until the row budget is spent", () => {
+    const counts: Partial<Record<string, number>> = { http: 5, github: 4, render: 3, neon: 1 };
+    const count = (id: string) => counts[id] ?? 0;
+    expect(pickProviders(["http", "github", "render", "neon"], null, count)).toEqual([
+      "http",
+      "github",
+      "render",
+    ]);
+    expect(pickProviders(["http", "github", "render", "neon"], "github", count)).toEqual([
+      "render",
+      "neon",
+      "http",
+    ]);
+  });
+
+  it("always takes the first provider even when it alone is over budget", () => {
+    expect(pickProviders(["github", "http"], null, () => 20)).toEqual(["github"]);
+  });
+});
+
 describe("run", () => {
-  it("checks one provider per run, writes only changes and alerts on status change", async () => {
+  it("checks providers within budget, writes only changes and alerts on status change", async () => {
     let code = 200;
     const t0 = new Date("2026-11-03T10:00:00Z");
 
     let calls = world(() => code);
     await run(testEnv, t0);
     let written = await patches(calls);
-    expect(written).toHaveLength(1);
-    expect(written[0]?.page).toBe("page-http");
+    expect(written.map((w) => w.page)).toEqual(["page-http", "page-github"]);
+    expect(await testEnv.INKLING_STATE.get("cursor")).toBe("github");
     expect(written[0]?.properties).toEqual({
       Status: { status: { name: "Up" } },
       URL: { url: "https://example.com" },
@@ -61,21 +83,12 @@ describe("run", () => {
       "Last deploy": { date: { start: t0.toISOString() } },
       "Last checked": { date: { start: t0.toISOString() } },
     });
-    expect(await testEnv.INKLING_STATE.get("cursor")).toBe("http");
-    expect(calls.some((c) => c.url.includes("api.github.com"))).toBe(false);
-
-    calls = world(() => code);
-    await run(testEnv, t0);
-    written = await patches(calls);
-    expect(written.map((w) => w.page)).toEqual(["page-github"]);
-    expect(await testEnv.INKLING_STATE.get("cursor")).toBe("github");
 
     calls = world(() => code);
     await run(testEnv, new Date(t0.getTime() + 30 * 60 * 1000));
     expect(await patches(calls)).toHaveLength(0);
     expect(calls.some((c) => c.url.includes("ntfy.sh"))).toBe(false);
 
-    await testEnv.INKLING_STATE.put("cursor", "render");
     code = 503;
     calls = world(() => code);
     await run(testEnv, new Date(t0.getTime() + 45 * 60 * 1000));
@@ -103,6 +116,27 @@ describe("run", () => {
       Status: { status: { name: "Unknown" } },
       URL: { url: "https://github.com/acme/site" },
       Error: { rich_text: [{ text: { content: "Check failed: HTTP 502" } }] },
+    });
+  });
+});
+
+describe("toProperties", () => {
+  it("appends a clickable how-to link to the Error text", () => {
+    const properties = toProperties({
+      status: "Unknown",
+      error: "NEON_API_KEY is not set.",
+      errorLink: "https://console.neon.tech/app/settings/api-keys",
+    });
+    expect(properties?.["Error"]).toEqual({
+      rich_text: [
+        { text: { content: "NEON_API_KEY is not set." } },
+        {
+          text: {
+            content: " How to get it",
+            link: { url: "https://console.neon.tech/app/settings/api-keys" },
+          },
+        },
+      ],
     });
   });
 });

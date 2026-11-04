@@ -30,6 +30,7 @@ function pagesCheck({ result }: PagesDeployments): Check {
  */
 export const cloudflare: Provider = {
   id: "cloudflare",
+  cost: 1,
   link(resourceId, env) {
     if (!env.CF_ACCOUNT_ID) return "https://dash.cloudflare.com";
     const base = `https://dash.cloudflare.com/${env.CF_ACCOUNT_ID}`;

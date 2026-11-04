@@ -102,28 +102,65 @@ async function readSnapshots(env: Env, providerId: ProviderId): Promise<Record<s
 }
 
 /**
- * One cron tick: check every monitored row of one provider and patch only what changed.
+ * Subrequests a run may spend on checks and Notion writes.
  *
- * One provider per run keeps each invocation well under the Free plan's subrequest cap.
+ * Workers Free allows 50; the rest covers the Notion query pages, alerts and Google token exchanges.
+ */
+const RUN_BUDGET = 40;
+
+/**
+ * Picks providers in round-robin order, starting after `last`, until their rows would pass the budget.
+ *
+ * The first provider is always taken, even over budget, so a provider with many rows still gets its turn.
+ * Each row is costed at its provider's calls plus one Notion write.
+ */
+export function pickProviders(
+  present: ProviderId[],
+  last: string | null,
+  rowCount: (id: ProviderId) => number,
+): ProviderId[] {
+  const first = nextProvider(present, last);
+  if (!first) return [];
+  const start = present.indexOf(first);
+  const order = [...present.slice(start), ...present.slice(0, start)];
+  const picked: ProviderId[] = [];
+  let spent = 0;
+  for (const id of order) {
+    const cost = rowCount(id) * (providers[id].cost + 1);
+    if (picked.length > 0 && spent + cost > RUN_BUDGET) break;
+    picked.push(id);
+    spent += cost;
+  }
+  return picked;
+}
+
+/**
+ * One cron tick: check every monitored row of as many providers as the budget allows, and patch only what changed.
  */
 export async function run(env: Env, now = new Date()): Promise<void> {
   const notion = notionClient(env);
   const rows = await queryMonitored(notion, env.NOTION_DATA_SOURCE_ID);
   const present = PROVIDER_IDS.filter((id) => rows.some((row) => row.provider === id));
-  const providerId = nextProvider(present, await env.INKLING_STATE.get("cursor"));
-  if (!providerId) return;
-  await env.INKLING_STATE.put("cursor", providerId);
+  const picked = pickProviders(
+    present,
+    await env.INKLING_STATE.get("cursor"),
+    (id) => rows.filter((row) => row.provider === id).length,
+  );
+  const last = picked.at(-1);
+  if (!last) return;
+  await env.INKLING_STATE.put("cursor", last);
 
-  const before = await readSnapshots(env, providerId);
-  const after: Record<string, Snapshot> = {};
   const context = { env, notion, now, write: throttle(334) };
-  for (const row of rows.filter((r) => r.provider === providerId)) {
-    const next = await updateRow(context, row, before[row.id]);
-    if (next) after[row.id] = next;
-  }
-
-  if (JSON.stringify(after) !== JSON.stringify(before)) {
-    await env.INKLING_STATE.put(`snapshot:${providerId}`, JSON.stringify(after));
+  for (const providerId of picked) {
+    const before = await readSnapshots(env, providerId);
+    const after: Record<string, Snapshot> = {};
+    for (const row of rows.filter((r) => r.provider === providerId)) {
+      const next = await updateRow(context, row, before[row.id]);
+      if (next) after[row.id] = next;
+    }
+    if (JSON.stringify(after) !== JSON.stringify(before)) {
+      await env.INKLING_STATE.put(`snapshot:${providerId}`, JSON.stringify(after));
+    }
   }
 }
 

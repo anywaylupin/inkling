@@ -10,13 +10,23 @@ inkling only touches the properties it owns, and only on rows with Monitor ticke
 
 ## Providers
 
-| Provider     | Resource ID                                | What it reads                                                         |
-| ------------ | ------------------------------------------ | --------------------------------------------------------------------- |
-| `http`       | a URL such as `https://example.com`        | GET with a 10 s timeout; 2xx under 2 s is Up, slow or 3xx is Degraded |
-| `github`     | `owner/repo`                               | latest completed workflow run on the default branch, latest release   |
-| `cloudflare` | a Worker script name, or `pages:<project>` | latest Worker deployment, or latest Pages production deployment       |
-| `vercel`     | a project id such as `prj_...`             | latest production deployment state                                    |
-| `render`     | a service id such as `srv-...`             | suspended flag and latest deploy status                               |
+| Provider          | Resource ID                                          | What it reads                                                         |
+| ----------------- | ---------------------------------------------------- | --------------------------------------------------------------------- |
+| `http`            | a URL such as `https://example.com`                  | GET with a 10 s timeout; 2xx under 2 s is Up, slow or 3xx is Degraded |
+| `github`          | `owner/repo`                                         | latest completed workflow run on the default branch, latest release   |
+| `cloudflare`      | a Worker script name, or `pages:<project>`           | latest Worker deployment, or latest Pages production deployment       |
+| `vercel`          | a project id such as `prj_...`                       | latest production deployment state                                    |
+| `render`          | a service id such as `srv-...`                       | suspended flag and latest deploy status                               |
+| `neon`            | a project name or id                                 | project found, compute endpoint state; idle computes count as Up      |
+| `lambda`          | a function name or ARN                               | GetFunction state and last update; Inactive counts as Up              |
+| `dynamodb`        | a table name or ARN                                  | DescribeTable status                                                  |
+| `mistral`         | anything, such as the project name                   | the API key lists models                                              |
+| `googlegemini`    | anything, such as the project name                   | the API key lists models                                              |
+| `googleanalytics` | a GA4 property id or display name                    | events recorded since yesterday; none is Down                         |
+| `googlecloud`     | a Cloud Run service as `service` or `region/service` | the service's ready condition, latest revision and URL                |
+
+AWS resources without an ARN use `AWS_REGION`, and Cloud Run services without a region use `GCP_REGION`, or `us-central1` when that is unset.
+A missing token turns the row Unknown, and its Error column links to where to create the token.
 
 ## Notion properties
 
@@ -79,14 +89,14 @@ curl -X POST https://inkling.<subdomain>.workers.dev/refresh \
 
 ## Limits
 
-- One provider per run.
-  With all five providers in use, each row refreshes about every 75 minutes.
-- New cron triggers can take about 15 minutes to start firing after a deploy.
 - Workers Free allows 50 subrequests per run.
-  A GitHub row costs 3, a Render row 2, every other row 1, plus one Notion write per changed row, so keep under about 15 GitHub rows.
+  Each run takes providers in round-robin order until their rows would cost more than 40, counting each row as its provider's calls plus one Notion write.
+  A GitHub or Google Analytics row costs 4, an http, Render, Neon or Cloud Run row 3, every other row 2.
+  A provider with more rows than the budget still gets a whole run to itself, so keep under about 12 GitHub rows.
+- New cron triggers can take about 15 minutes to start firing after a deploy.
 - Workers Free allows 10 ms of CPU per run; time spent waiting on `fetch` does not count.
 - Notion writes are spaced to 3 per second, and Last checked is written at most once an hour per row.
-- KV is written once per run for the round-robin cursor and once per provider when a snapshot changes, well under the Free daily write cap.
+- KV is written once per run for the round-robin cursor and once per checked provider when its snapshot changes, well under the Free daily write cap.
 - inkling is a board, not a pager.
   Keep UptimeRobot or a similar service for real time downtime alerts.
 

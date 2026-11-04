@@ -38,6 +38,6 @@ describe("vercel", () => {
 
   it("is Unknown without a token", async () => {
     const result = await vercel.check("prj_1", { ...testEnv, VERCEL_TOKEN: undefined });
-    expect(result).toEqual({ status: "Unknown", error: "VERCEL_TOKEN is not set" });
+    expect(result).toMatchObject({ status: "Unknown", error: "VERCEL_TOKEN is not set." });
   });
 });

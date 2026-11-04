@@ -16,6 +16,7 @@ interface Deployments {
 /** Reads a project id; only the latest production deployment counts. */
 export const vercel: Provider = {
   id: "vercel",
+  cost: 1,
   link: () => "https://vercel.com/dashboard",
   async check(projectId, env) {
     if (!env.VERCEL_TOKEN) return missingSecret("VERCEL_TOKEN");

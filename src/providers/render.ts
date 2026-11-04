@@ -15,6 +15,7 @@ interface Deploy {
  */
 export const render: Provider = {
   id: "render",
+  cost: 2,
   link: (serviceId) => `https://dashboard.render.com/web/${encodeURIComponent(serviceId)}`,
   async check(serviceId, env) {
     if (!env.RENDER_API_KEY) return missingSecret("RENDER_API_KEY");

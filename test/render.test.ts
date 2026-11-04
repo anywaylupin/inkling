@@ -33,6 +33,6 @@ describe("render", () => {
 
   it("is Unknown without an API key", async () => {
     const result = await render.check("srv-abc", { ...testEnv, RENDER_API_KEY: undefined });
-    expect(result).toEqual({ status: "Unknown", error: "RENDER_API_KEY is not set" });
+    expect(result).toMatchObject({ status: "Unknown", error: "RENDER_API_KEY is not set." });
   });
 });

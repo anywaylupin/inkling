@@ -1,0 +1,7 @@
+{
+  "name": "projects/acme/locations/us-central1/services/api",
+  "uri": "https://api-abc123-uc.a.run.app",
+  "updateTime": "2026-11-02T07:30:00.000000Z",
+  "latestReadyRevision": "projects/acme/locations/us-central1/services/api/revisions/api-00042-xyz",
+  "terminalCondition": { "type": "Ready", "state": "CONDITION_SUCCEEDED" }
+}
