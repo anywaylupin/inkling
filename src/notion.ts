@@ -1,6 +1,8 @@
 import {
+  APIErrorCode,
   Client,
   isFullPage,
+  isNotionClientError,
   type PageObjectResponse,
   type UpdatePageParameters,
 } from "@notionhq/client";
@@ -43,6 +45,16 @@ function isProviderId(value: string): value is ProviderId {
   return PROVIDER_IDS.some((id) => id === value);
 }
 
+/** Turns a page into a Row, or undefined unless Monitor is ticked and Provider and Resource ID are set. */
+function toRow(page: PageObjectResponse): Row | undefined {
+  const monitor = page.properties["Monitor"];
+  const provider = text(page.properties["Provider"]);
+  const resourceId = text(page.properties["Resource ID"]).trim();
+  if (monitor?.type !== "checkbox" || !monitor.checkbox) return undefined;
+  if (!isProviderId(provider) || !resourceId) return undefined;
+  return { id: page.id, name: text(page.properties["Name"]), provider, resourceId };
+}
+
 /** Lists every row with Monitor ticked and both Provider and Resource ID set, across all result pages. */
 export async function queryMonitored(notion: Client, dataSourceId: string): Promise<Row[]> {
   const rows: Row[] = [];
@@ -53,16 +65,38 @@ export async function queryMonitored(notion: Client, dataSourceId: string): Prom
       filter: { property: "Monitor", checkbox: { equals: true } },
       start_cursor: cursor,
     });
-    for (const result of page.results) {
-      if (!isFullPage(result)) continue;
-      const provider = text(result.properties["Provider"]);
-      const resourceId = text(result.properties["Resource ID"]).trim();
-      if (!isProviderId(provider) || !resourceId) continue;
-      rows.push({ id: result.id, name: text(result.properties["Name"]), provider, resourceId });
-    }
+    rows.push(...page.results.flatMap((result) => (isFullPage(result) && toRow(result)) || []));
     cursor = page.next_cursor ?? undefined;
   } while (cursor);
   return rows;
+}
+
+/** Notion returns ids with or without dashes depending on the endpoint. */
+function sameId(a: string, b: string): boolean {
+  return a.replaceAll("-", "").toLowerCase() === b.replaceAll("-", "").toLowerCase();
+}
+
+/**
+ * Reads one monitored row of the configured data source, or undefined when the page is missing, elsewhere or not monitored.
+ *
+ * The parent check stops a valid caller from pointing inkling at another page the connection can see.
+ */
+export async function retrieveRow(
+  notion: Client,
+  dataSourceId: string,
+  pageId: string,
+): Promise<Row | undefined> {
+  try {
+    const page = await notion.pages.retrieve({ page_id: pageId });
+    if (!isFullPage(page) || page.in_trash) return undefined;
+    if (page.parent.type !== "data_source_id") return undefined;
+    if (!sameId(page.parent.data_source_id, dataSourceId)) return undefined;
+    return toRow(page);
+  } catch (error) {
+    const missing = [APIErrorCode.ObjectNotFound, APIErrorCode.ValidationError];
+    if (isNotionClientError(error) && missing.some((code) => code === error.code)) return undefined;
+    throw error;
+  }
 }
 
 /** Notion caps a rich text item at 2000 characters. */

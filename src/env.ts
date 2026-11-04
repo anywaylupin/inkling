@@ -13,4 +13,5 @@ export interface Env {
   VERCEL_TOKEN?: string;
   RENDER_API_KEY?: string;
   ALERT_URL?: string;
+  REFRESH_SECRET?: string;
 }

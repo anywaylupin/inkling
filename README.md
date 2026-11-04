@@ -38,6 +38,31 @@ inkling owns Status, Last deploy, Deploy state, Usage, Usage note, Last checked 
 Set `ALERT_URL` to an ntfy topic URL to get one push notification per status change.
 Pick a long random topic name, because anyone who knows it can read the topic.
 
+## Refresh a row now
+
+`POST /refresh` checks one row right away instead of waiting for its provider's turn.
+It stays off until you set the `REFRESH_SECRET` Worker secret to a long random string.
+
+Every request needs the header `x-inkling-key: <REFRESH_SECRET>` and a JSON body that is either a Notion button webhook or `{ "page_id": "<page id>" }`.
+It answers 202 at once and updates the row a few seconds later.
+It refuses pages outside your data source and rows without Monitor ticked.
+
+To add a refresh button in Notion:
+
+1. Add a property of type Button named `Refresh`.
+2. Add the action Send webhook, with URL `https://inkling.<subdomain>.workers.dev/refresh`.
+3. Add the custom header `x-inkling-key` with your `REFRESH_SECRET` value.
+4. Leave the page properties out of the body; inkling reads the row itself.
+
+From a terminal:
+
+```sh
+curl -X POST https://inkling.<subdomain>.workers.dev/refresh \
+  -H "x-inkling-key: $REFRESH_SECRET" \
+  -H "content-type: application/json" \
+  -d '{"page_id":"<page id>"}'
+```
+
 ## Limits
 
 - One provider per run.

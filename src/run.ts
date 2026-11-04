@@ -1,3 +1,4 @@
+import type { Client } from "@notionhq/client";
 import type { Env } from "./env";
 import { notionClient, queryMonitored, toProperties, type Row } from "./notion";
 import { PROVIDER_IDS, providers, type Check, type ProviderId } from "./providers";
@@ -46,6 +47,53 @@ async function alert(env: Env, row: Row, from: string, to: string): Promise<void
   }
 }
 
+/** What one row update needs besides the row itself. */
+interface UpdateContext {
+  env: Env;
+  notion: Client;
+  now: Date;
+  write: ReturnType<typeof throttle>;
+}
+
+/**
+ * Checks one row, patches Notion when something changed or Last checked is due, and alerts on a status change.
+ *
+ * Returns the row's new snapshot, or the previous one when the Notion write failed so the next run retries it.
+ * `force` writes Last checked even within the hour, for manual refreshes.
+ */
+async function updateRow(
+  { env, notion, now, write }: UpdateContext,
+  row: Row,
+  prev: Snapshot | undefined,
+  force = false,
+): Promise<Snapshot | undefined> {
+  const check = await safeCheck(row, env);
+  const changed = !prev || DIFF_FIELDS.some((field) => prev[field] !== check[field]);
+  const stale = force || !prev || now.getTime() - Date.parse(prev.checkedAt) >= HOUR_MS;
+  const checkedAt = stale || !prev ? now.toISOString() : prev.checkedAt;
+  if (changed || stale) {
+    try {
+      await write(() =>
+        notion.pages.update({
+          page_id: row.id,
+          properties: toProperties(check, stale ? checkedAt : undefined),
+        }),
+      );
+    } catch (error) {
+      console.error(`notion update failed: ${error instanceof Error ? error.name : "Error"}`);
+      return prev;
+    }
+  }
+  if (prev && prev.status !== check.status) await alert(env, row, prev.status, check.status);
+  const { status, lastDeploy, deployState, usage, error } = check;
+  return { status, lastDeploy, deployState, usage, error, checkedAt };
+}
+
+/** Reads one provider's snapshots from KV. */
+async function readSnapshots(env: Env, providerId: ProviderId): Promise<Record<string, Snapshot>> {
+  return (await env.INKLING_STATE.get(`snapshot:${providerId}`, "json")) ?? {};
+}
+
 /**
  * One cron tick: check every monitored row of one provider and patch only what changed.
  *
@@ -59,37 +107,29 @@ export async function run(env: Env, now = new Date()): Promise<void> {
   if (!providerId) return;
   await env.INKLING_STATE.put("cursor", providerId);
 
-  const key = `snapshot:${providerId}`;
-  const before = (await env.INKLING_STATE.get<Record<string, Snapshot>>(key, "json")) ?? {};
+  const before = await readSnapshots(env, providerId);
   const after: Record<string, Snapshot> = {};
-  const write = throttle(334);
-
+  const context = { env, notion, now, write: throttle(334) };
   for (const row of rows.filter((r) => r.provider === providerId)) {
-    const check = await safeCheck(row, env);
-    const prev = before[row.id];
-    const changed = !prev || DIFF_FIELDS.some((field) => prev[field] !== check[field]);
-    const stale = !prev || now.getTime() - Date.parse(prev.checkedAt) >= HOUR_MS;
-    const checkedAt = stale ? now.toISOString() : prev.checkedAt;
-    if (changed || stale) {
-      try {
-        await write(() =>
-          notion.pages.update({
-            page_id: row.id,
-            properties: toProperties(check, stale ? checkedAt : undefined),
-          }),
-        );
-      } catch (error) {
-        console.error(`notion update failed: ${error instanceof Error ? error.name : "Error"}`);
-        if (prev) after[row.id] = prev;
-        continue;
-      }
-    }
-    const { status, lastDeploy, deployState, usage, error } = check;
-    after[row.id] = { status, lastDeploy, deployState, usage, error, checkedAt };
-    if (prev && prev.status !== check.status) await alert(env, row, prev.status, check.status);
+    const next = await updateRow(context, row, before[row.id]);
+    if (next) after[row.id] = next;
   }
 
   if (JSON.stringify(after) !== JSON.stringify(before)) {
-    await env.INKLING_STATE.put(key, JSON.stringify(after));
+    await env.INKLING_STATE.put(`snapshot:${providerId}`, JSON.stringify(after));
   }
+}
+
+/**
+ * Checks a single row right away, for the refresh endpoint, and always writes Last checked.
+ *
+ * shortcut: the snapshot read-modify-write can race a cron run on the same provider and lose this row's entry, which only costs one extra Notion write on the next run; move snapshots to one KV key per row if refreshes get frequent.
+ */
+export async function refreshRow(env: Env, row: Row, now = new Date()): Promise<void> {
+  const snapshots = await readSnapshots(env, row.provider);
+  const context = { env, notion: notionClient(env), now, write: throttle(334) };
+  const next = await updateRow(context, row, snapshots[row.id], true);
+  if (!next) return;
+  snapshots[row.id] = next;
+  await env.INKLING_STATE.put(`snapshot:${row.provider}`, JSON.stringify(snapshots));
 }
