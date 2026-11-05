@@ -1,12 +1,12 @@
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { handleRefresh } from "../src/refresh";
+import { handleSync } from "../src/sync";
 import query from "./fixtures/notion-query.json";
 import { mockFetch, testEnv } from "./helpers";
 
 const PAGE_ID = "1f2e3d4c-5b6a-4789-8abc-def012345678";
 
-const env = { ...testEnv, REFRESH_SECRET: "test-refresh-secret" };
+const env = { ...testEnv, SYNC_SECRET: "test-sync-secret" };
 
 /** The http row from the query fixture as pages.retrieve returns it, under `dataSourceId`. */
 function page(dataSourceId = "ds-1") {
@@ -18,16 +18,16 @@ function page(dataSourceId = "ds-1") {
   };
 }
 
-/** A refresh request shaped like a Notion button webhook. */
-function webhook(key = "test-refresh-secret") {
-  return new Request("https://para.test/refresh", {
+/** A sync request shaped like a Notion button webhook. */
+function webhook(key = "test-sync-secret") {
+  return new Request("https://para.test/sync", {
     method: "POST",
     headers: { "x-para-key": key, "content-type": "application/json" },
     body: JSON.stringify({ source: { type: "automation" }, data: { object: "page", id: PAGE_ID } }),
   });
 }
 
-describe("refresh", () => {
+describe("sync", () => {
   it("checks the row, writes Last checked and answers before the check finishes", async () => {
     const calls = mockFetch((url, request) => {
       if (url.hostname === "example.com") return new Response("ok");
@@ -35,9 +35,9 @@ describe("refresh", () => {
       return Response.json({ object: "page", id: PAGE_ID });
     });
     const ctx = createExecutionContext();
-    const res = await handleRefresh(webhook(), env, ctx);
+    const res = await handleSync(webhook(), env, ctx);
     expect(res.status).toBe(202);
-    expect(await res.json()).toEqual({ refreshing: PAGE_ID, provider: "http" });
+    expect(await res.json()).toEqual({ syncing: PAGE_ID, provider: "http" });
     await waitOnExecutionContext(ctx);
 
     const patch = calls.find((c) => c.method === "PATCH");
@@ -55,13 +55,13 @@ describe("refresh", () => {
     mockFetch((url) =>
       url.hostname === "api.notion.com" ? Response.json(page()) : new Response("ok"),
     );
-    const request = new Request("https://para.test/refresh", {
+    const request = new Request("https://para.test/sync", {
       method: "POST",
-      headers: { "x-para-key": "test-refresh-secret" },
+      headers: { "x-para-key": "test-sync-secret" },
       body: JSON.stringify({ page_id: PAGE_ID }),
     });
     const ctx = createExecutionContext();
-    expect((await handleRefresh(request, env, ctx)).status).toBe(202);
+    expect((await handleSync(request, env, ctx)).status).toBe(202);
     await waitOnExecutionContext(ctx);
   });
 
@@ -79,7 +79,7 @@ describe("refresh", () => {
       },
     };
     mockFetch(() => Response.json(formulas));
-    const res = await handleRefresh(
+    const res = await handleSync(
       webhook(),
       { ...env, GITHUB_TOKEN: undefined },
       {
@@ -87,33 +87,33 @@ describe("refresh", () => {
         waitUntil: () => {},
       },
     );
-    expect(await res.json()).toEqual({ refreshing: PAGE_ID, provider: "github" });
+    expect(await res.json()).toEqual({ syncing: PAGE_ID, provider: "github" });
   });
 
   it("rejects a wrong key without calling Notion", async () => {
     const calls = mockFetch(() => new Response("unexpected", { status: 500 }));
-    const res = await handleRefresh(webhook("wrong"), env, createExecutionContext());
+    const res = await handleSync(webhook("wrong"), env, createExecutionContext());
     expect(res.status).toBe(401);
     expect(calls).toHaveLength(0);
   });
 
-  it("is off when REFRESH_SECRET is not set", async () => {
-    const res = await handleRefresh(webhook(), testEnv, createExecutionContext());
+  it("is off when SYNC_SECRET is not set", async () => {
+    const res = await handleSync(webhook(), testEnv, createExecutionContext());
     expect(res.status).toBe(404);
   });
 
   it("refuses a page from another data source", async () => {
     mockFetch(() => Response.json(page("other-ds")));
-    const res = await handleRefresh(webhook(), env, createExecutionContext());
+    const res = await handleSync(webhook(), env, createExecutionContext());
     expect(res.status).toBe(404);
   });
 
   it("refuses a body without a page id", async () => {
-    const request = new Request("https://para.test/refresh", {
+    const request = new Request("https://para.test/sync", {
       method: "POST",
-      headers: { "x-para-key": "test-refresh-secret" },
+      headers: { "x-para-key": "test-sync-secret" },
       body: "not json",
     });
-    expect((await handleRefresh(request, env, createExecutionContext())).status).toBe(400);
+    expect((await handleSync(request, env, createExecutionContext())).status).toBe(400);
   });
 });

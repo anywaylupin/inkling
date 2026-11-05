@@ -22,5 +22,5 @@ export interface Env {
   GCP_SA_KEY?: string;
   GCP_REGION?: string;
   ALERT_URL?: string;
-  REFRESH_SECRET?: string;
+  SYNC_SECRET?: string;
 }

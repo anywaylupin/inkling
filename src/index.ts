@@ -1,13 +1,13 @@
 import type { Env } from "./env";
-import { handleRefresh } from "./refresh";
+import { handleSync } from "./sync";
 import { run } from "./run";
 
 export default {
   async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
     if (pathname === "/health") return Response.json({ ok: true });
-    if (pathname === "/refresh" && request.method === "POST") {
-      return handleRefresh(request, env, ctx);
+    if (pathname === "/sync" && request.method === "POST") {
+      return handleSync(request, env, ctx);
     }
     return new Response("Not found", { status: 404 });
   },

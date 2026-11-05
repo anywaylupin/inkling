@@ -78,7 +78,7 @@ interface UpdateContext {
  * Checks one row, patches Notion when something changed or Last checked is due, and alerts on a status change.
  *
  * Returns the row's new snapshot, or the previous one when the Notion write failed so the next run retries it.
- * `force` writes Last checked even within the hour, for manual refreshes.
+ * `force` writes Last checked even within the hour, for manual syncs.
  */
 async function updateRow(
   { env, notion, now, write }: UpdateContext,
@@ -177,11 +177,11 @@ export async function run(env: Env, now = new Date()): Promise<void> {
 }
 
 /**
- * Checks a single row right away, for the refresh endpoint, and always writes Last checked.
+ * Checks a single row right away, for the sync endpoint, and always writes Last checked.
  *
- * shortcut: the snapshot read-modify-write can race a cron run on the same provider and lose this row's entry, which only costs one extra Notion write on the next run; move snapshots to one KV key per row if refreshes get frequent.
+ * shortcut: the snapshot read-modify-write can race a cron run on the same provider and lose this row's entry, which only costs one extra Notion write on the next run; move snapshots to one KV key per row if syncs get frequent.
  */
-export async function refreshRow(env: Env, row: Row, now = new Date()): Promise<void> {
+export async function syncRow(env: Env, row: Row, now = new Date()): Promise<void> {
   const snapshots = await readSnapshots(env, row.provider);
   const context = { env, notion: notionClient(env), now, write: throttle(334) };
   const next = await updateRow(context, row, snapshots[row.id], true);

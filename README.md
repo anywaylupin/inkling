@@ -66,27 +66,27 @@ Create Status by hand with the four options above.
 Set `ALERT_URL` to an ntfy topic URL to get one push notification per status change.
 Pick a long random topic name, because anyone who knows it can read the topic.
 
-## Refresh a row now
+## Sync a row now
 
-`POST /refresh` checks one row right away instead of waiting for its provider's turn.
-It stays off until you set the `REFRESH_SECRET` Worker secret to a long random string.
+`POST /sync` checks one row right away instead of waiting for its provider's turn.
+It stays off until you set the `SYNC_SECRET` Worker secret to a long random string.
 
-Every request needs the header `x-para-key: <REFRESH_SECRET>` and a JSON body that is either a Notion button webhook or `{ "page_id": "<page id>" }`.
+Every request needs the header `x-para-key: <SYNC_SECRET>` and a JSON body that is either a Notion button webhook or `{ "page_id": "<page id>" }`.
 It answers 202 at once and updates the row a few seconds later.
 It refuses pages outside your data source and rows without Monitor ticked.
 
-To add a refresh button in Notion:
+To add a sync button in Notion:
 
-1. Add a property of type Button named `Refresh`.
-2. Add the action Send webhook, with URL `https://para.<subdomain>.workers.dev/refresh`.
-3. Add the custom header `x-para-key` with your `REFRESH_SECRET` value.
+1. Add a property of type Button named `Sync`.
+2. Add the action Send webhook, with URL `https://para.<subdomain>.workers.dev/sync`.
+3. Add the custom header `x-para-key` with your `SYNC_SECRET` value.
 4. Leave the page properties out of the body; PARA reads the row itself.
 
 From a terminal:
 
 ```sh
-curl -X POST https://para.<subdomain>.workers.dev/refresh \
-  -H "x-para-key: $REFRESH_SECRET" \
+curl -X POST https://para.<subdomain>.workers.dev/sync \
+  -H "x-para-key: $SYNC_SECRET" \
   -H "content-type: application/json" \
   -d '{"page_id":"<page id>"}'
 ```

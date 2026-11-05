@@ -1,6 +1,6 @@
 import type { Env } from "./env";
 import { notionClient, retrieveRow } from "./notion";
-import { refreshRow } from "./run";
+import { syncRow } from "./run";
 
 /** Compares in constant time so response timing never leaks how much of the key matched. */
 function sameSecret(given: string | null, expected: string): boolean {
@@ -23,18 +23,18 @@ function pageIdFrom(body: unknown): string | undefined {
 }
 
 /**
- * Handles `POST /refresh`: checks one row now instead of waiting for its provider's cron turn.
+ * Handles `POST /sync`: checks one row now instead of waiting for its provider's cron turn.
  *
  * The check runs after the response because Notion button webhooks expect a quick answer and an http check can take 20 s.
- * Without REFRESH_SECRET the route answers 404, so the endpoint is off until you opt in.
+ * Without SYNC_SECRET the route answers 404, so the endpoint is off until you opt in.
  */
-export async function handleRefresh(
+export async function handleSync(
   request: Request,
   env: Env,
   ctx: ExecutionContext,
 ): Promise<Response> {
-  if (!env.REFRESH_SECRET) return new Response("Not found", { status: 404 });
-  if (!sameSecret(request.headers.get("x-para-key"), env.REFRESH_SECRET)) {
+  if (!env.SYNC_SECRET) return new Response("Not found", { status: 404 });
+  if (!sameSecret(request.headers.get("x-para-key"), env.SYNC_SECRET)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const pageId = pageIdFrom(await request.json().catch(() => undefined));
@@ -43,6 +43,6 @@ export async function handleRefresh(
   }
   const row = await retrieveRow(notionClient(env), env.NOTION_DATA_SOURCE_ID, pageId);
   if (!row) return Response.json({ error: "No monitored row with that id" }, { status: 404 });
-  ctx.waitUntil(refreshRow(env, row));
-  return Response.json({ refreshing: row.id, provider: row.provider }, { status: 202 });
+  ctx.waitUntil(syncRow(env, row));
+  return Response.json({ syncing: row.id, provider: row.provider }, { status: 202 });
 }
