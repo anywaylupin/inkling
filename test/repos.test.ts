@@ -7,7 +7,6 @@ import { mockFetch, testEnv } from "./helpers";
 const env = {
   ...testEnv,
   REPOS_DATA_SOURCE_ID: "repos-ds",
-  TASKS_DATA_SOURCE_ID: "tasks-ds",
   SYNC_SECRET: "test-sync-secret",
 };
 
@@ -67,7 +66,6 @@ const ROWS = {
     row("page-site", "repos-ds", "acme/site", "Shipped"),
     row("page-old", "repos-ds", "acme/old", "Shipped"),
   ],
-  "tasks-ds": [row("task-3", "tasks-ds", "acme/site#3", "In progress")],
 };
 
 /** Fakes GitHub GraphQL and Notion; `graphqlErrors` makes the first GitHub call fail like a rate limit. */
@@ -89,24 +87,7 @@ function fakeApis(graphqlErrors = false) {
           },
         });
       }
-      return Response.json({
-        data: {
-          authored: {
-            nodes: [
-              {
-                number: 4,
-                title: "Add dark mode",
-                url: "https://github.com/acme/site/pull/4",
-                repository: { nameWithOwner: "acme/site" },
-              },
-            ],
-          },
-          reviewing: { nodes: [{}] },
-          r0: null,
-          p0: { pullRequest: { state: "MERGED" } },
-        },
-        errors: [{ type: "NOT_FOUND" }],
-      });
+      return Response.json({ data: { r0: null }, errors: [{ type: "NOT_FOUND" }] });
     }
     const source = /\/data_sources\/([^/]+)\/query/.exec(url.pathname)?.[1];
     if (source) {
@@ -134,29 +115,18 @@ async function writes(calls: Request[]) {
 }
 
 describe("syncRepos", () => {
-  it("creates new repos, updates changed ones, deprecates gone ones and mirrors pull requests", async () => {
+  it("creates new repos, updates changed ones and deprecates gone ones", async () => {
     const calls = fakeApis();
     await syncRepos(env, new Date("2026-11-05T00:00:00Z"));
     const all = await writes(calls);
 
     const created = all.filter((w) => w.method === "POST");
-    const repoCreate = created.find(
-      (w) => (w.body["parent"] as { data_source_id: string }).data_source_id === "repos-ds",
-    );
-    expect(repoCreate?.body["properties"]).toMatchObject({
+    expect(created).toHaveLength(1);
+    expect(created[0]?.body["properties"]).toMatchObject({
       Name: { title: [{ text: { content: "new" } }] },
       Origin: { select: { name: "Own" } },
       Status: { status: { name: "Discovered" } },
       Visibility: { select: { name: "Private" } },
-    });
-    const taskCreate = created.find(
-      (w) => (w.body["parent"] as { data_source_id: string }).data_source_id === "tasks-ds",
-    );
-    expect(taskCreate?.body["properties"]).toMatchObject({
-      Key: { rich_text: [{ text: { content: "acme/site#4" } }] },
-      Issue: { url: "https://github.com/acme/site/pull/4" },
-      Status: { status: { name: "In progress" } },
-      Repo: { relation: [{ id: "page-site" }] },
     });
 
     const update = (id: string) =>
@@ -172,7 +142,6 @@ describe("syncRepos", () => {
       "Last synced": { date: { start: "2026-11-05T00:00:00.000Z" } },
     });
     expect(update("page-old")).toEqual({ Status: { status: { name: "Deprecated" } } });
-    expect(update("task-3")).toEqual({ Status: { status: { name: "Done" } } });
   });
 
   it("keeps Notion keys out of the query text", async () => {
@@ -181,7 +150,7 @@ describe("syncRepos", () => {
     const lookup = calls.filter((c) => c.url.includes("graphql")).at(-1);
     const body = await lookup?.json<{ query: string; variables: Record<string, unknown> }>();
     expect(body?.query).not.toContain("acme/old");
-    expect(body?.variables).toMatchObject({ ro0: "acme", rn0: "old", pq0: 3 });
+    expect(body?.variables).toEqual({ ro0: "acme", rn0: "old" });
   });
 
   it("skips unchanged repos on the next run", async () => {

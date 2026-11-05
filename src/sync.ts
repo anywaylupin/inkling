@@ -26,7 +26,7 @@ function pageIdFrom(body: unknown): string | undefined {
 /**
  * Handles `POST /sync`: syncs the page's data source now instead of waiting for its cron turn.
  *
- * An Infra row is checked on its own; a Repos or Tasks row runs the whole repo sync, which costs about the same.
+ * An Infra row is checked on its own; a Repos row runs the whole repo sync, which costs about the same.
  * The work runs after the response because Notion button webhooks expect a quick answer and an http check can take 20 s.
  * Without SYNC_SECRET the route answers 404, so the endpoint is off until you opt in.
  * The parent check stops a valid caller from pointing PARA at another page the connection can see.
@@ -46,10 +46,7 @@ export async function handleSync(
   }
   const found = await retrievePage(notionClient(env), pageId);
   const source = found?.dataSourceId;
-  if (
-    sameId(source, env.REPOS_DATA_SOURCE_ID) ||
-    (env.REPOS_DATA_SOURCE_ID && sameId(source, env.TASKS_DATA_SOURCE_ID))
-  ) {
+  if (sameId(source, env.REPOS_DATA_SOURCE_ID)) {
     ctx.waitUntil(syncRepos(env));
     return Response.json({ syncing: pageId, source: "repos" }, { status: 200 });
   }

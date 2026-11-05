@@ -55,7 +55,7 @@ Create Status by hand with the four options above.
 
 1. Create a Notion internal connection with read and update content, and share your services database with it, plus any database its Provider or Resource ID formulas read through relations.
 2. Clone this repo and run `pnpm install`.
-3. Copy `.dev.vars.example` to `.dev.vars` and fill in `NOTION_TOKEN`, `INFRA_DATA_SOURCE_ID`, optionally `REPOS_DATA_SOURCE_ID` and `TASKS_DATA_SOURCE_ID`, and the provider tokens you use. See [SECURITY.md](SECURITY.md) for scopes.
+3. Copy `.dev.vars.example` to `.dev.vars` and fill in `NOTION_TOKEN`, `INFRA_DATA_SOURCE_ID`, optionally `REPOS_DATA_SOURCE_ID`, and the provider tokens you use. See [SECURITY.md](SECURITY.md) for scopes.
 4. Run `pnpm setup:notion` to add the PARA-owned properties to the data source.
 5. Log in to Cloudflare with `pnpm wrangler login`.
 6. Run `pnpm wrangler kv namespace create PARA_STATE` and put its id in `wrangler.jsonc` when you fork this repo.
@@ -68,7 +68,7 @@ Pick a long random topic name, because anyone who knows it can read the topic.
 
 ## GitHub repo sync
 
-Set `REPOS_DATA_SOURCE_ID` to turn it on, and `TASKS_DATA_SOURCE_ID` to also mirror pull requests.
+Set `REPOS_DATA_SOURCE_ID` to turn it on.
 It runs at minutes 7 and 37 of every hour, apart from the Infra cron, and needs `GITHUB_TOKEN` with the scopes in [SECURITY.md](SECURITY.md).
 
 Repos rows are keyed by Key, written as `owner/repo`:
@@ -80,23 +80,17 @@ Repos rows are keyed by Key, written as `owner/repo`:
 - Only the latest commit on the default branch is kept.
 - A row is written only when one of its synced values changed, so Last synced is the last time something changed.
 
-Tasks rows are keyed by Key, written as `owner/repo#number`:
-
-- Your open pull requests become tasks In progress, and pull requests waiting on your review become tasks To do, linked to their repo.
-- When a pull request merges, or your review is in, its task turns Done. When it closes unmerged, its task turns Cancelled.
-
 The repo sync needs these columns on Repos: Key and Description (text), GitHub and Domain (url), Topics (multi-select), Language and Visibility (select), Stars, Fork count, Open PRs and Open issues (number), Default branch, Commit message and Latest release (text), Last commit, Released and Last synced (date), Status (status, with Discovered and Deprecated options), Origin (select) and Forked from (relation to Repos).
-Tasks needs Key (text), Issue (url), Status (status, with To do, In progress, Done and Cancelled options) and Repo (relation to Repos).
 
 ## Sync a row now
 
 `POST /sync` syncs one row right away instead of waiting for its cron turn.
-An Infra row is checked on its own; a Repos or Tasks row runs the whole repo sync, which costs about the same.
+An Infra row is checked on its own; a Repos row runs the whole repo sync, which costs about the same.
 It stays off until you set the `SYNC_SECRET` Worker secret to a long random string.
 
 Every request needs the header `x-para-key: <SYNC_SECRET>` and a JSON body that is either a Notion button webhook or `{ "page_id": "<page id>" }`.
 It answers 200 at once, because Notion buttons treat any other status as a failure, and updates the row a few seconds later.
-It refuses pages outside your Infra, Repos and Tasks data sources, and Infra rows without Monitor ticked.
+It refuses pages outside your Infra and Repos data sources, and Infra rows without Monitor ticked.
 
 To add a sync button in Notion:
 
@@ -116,8 +110,8 @@ curl -X POST https://para.<subdomain>.workers.dev/sync \
 
 ## Limits
 
-- The repo sync writes at most 35 rows per run, pull request tasks first, so a first import of 100 repos fills in over about 3 runs.
-  It reads up to 300 owned repos, 100 tracked repos, 100 open pull request tasks and 50 pull requests per list.
+- The repo sync writes at most 35 rows per run, so a first import of 100 repos fills in over about 3 runs.
+  It reads up to 300 owned repos and 100 tracked repos.
 - Workers Free allows 50 subrequests per run.
   Each run takes providers in round-robin order until their rows would cost more than 40, counting each row as its provider's calls plus one Notion write.
   A Google Analytics row costs 5, a GitHub row 4, an http, Cloudflare, Vercel, Render, Neon, Lambda or Cloud Run row 3, every other row 2.
