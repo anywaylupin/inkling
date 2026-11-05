@@ -28,7 +28,7 @@ const MAX_LOOKUPS = 100;
 
 const REPO_FIELDS = `
   nameWithOwner name description url homepageUrl isPrivate isArchived isFork
-  owner { login }
+  owner { login avatarUrl }
   parent { nameWithOwner }
   stargazerCount forkCount
   primaryLanguage { name }
@@ -36,7 +36,8 @@ const REPO_FIELDS = `
   pullRequests(states: OPEN) { totalCount }
   issues(states: OPEN) { totalCount }
   defaultBranchRef { name target { ... on Commit { committedDate messageHeadline url } } }
-  latestRelease { tagName url publishedAt }`;
+  latestRelease { tagName url publishedAt }
+  openGraphImageUrl`;
 
 export interface Repo {
   nameWithOwner: string;
@@ -47,7 +48,7 @@ export interface Repo {
   isPrivate: boolean;
   isArchived: boolean;
   isFork: boolean;
-  owner: { login: string };
+  owner: { login: string; avatarUrl: string };
   parent: { nameWithOwner: string } | null;
   stargazerCount: number;
   forkCount: number;
@@ -60,6 +61,7 @@ export interface Repo {
     target: { committedDate?: string; messageHeadline?: string; url?: string } | null;
   } | null;
   latestRelease: { tagName: string; url: string; publishedAt: string | null } | null;
+  openGraphImageUrl: string;
 }
 
 /** Posts one GraphQL query; a null alias with a NOT_FOUND error means that repo is gone. */
@@ -196,6 +198,51 @@ export function repoProperties(
   };
 }
 
+const FAVICON = "https://www.google.com/s2/favicons?sz=128&domain=";
+const AVATAR = "https://avatars.githubusercontent.com/";
+
+/**
+ * The page icon: the homepage favicon for a public repo with a homepage, otherwise the owner's avatar.
+ *
+ * Private homepages fall back to the avatar so their domain never reaches the favicon service.
+ * shortcut: a site without a favicon shows the service's globe, not the avatar; fetch the favicon once per repo to tell them apart.
+ */
+export function repoIcon(repo: Repo): { type: "external"; external: { url: string } } {
+  let url = repo.owner.avatarUrl;
+  if (!repo.isPrivate && repo.homepageUrl) {
+    try {
+      url = FAVICON + new URL(repo.homepageUrl).hostname;
+    } catch {
+      // A malformed homepage keeps the avatar.
+    }
+  }
+  return { type: "external", external: { url } };
+}
+
+/** GitHub's generated repo card, and the host of social previews uploaded in repo settings. */
+const COVERS = [
+  "https://opengraph.githubassets.com/",
+  "https://repository-images.githubusercontent.com/",
+];
+
+/**
+ * The page cover: the repo's social preview, uploaded or generated, for public repos only.
+ *
+ * Private repos get none, because their preview links stop working without a GitHub session.
+ */
+export function repoCover(repo: Repo): { type: "external"; external: { url: string } } | null {
+  return repo.isPrivate ? null : { type: "external", external: { url: repo.openGraphImageUrl } };
+}
+
+/** True when the row has no icon or cover, or one PARA set, so sync may replace it. */
+function ownedBySync(
+  file: PageObjectResponse["icon"] | PageObjectResponse["cover"],
+  prefixes: string[],
+): boolean {
+  if (!file) return true;
+  return file.type === "external" && prefixes.some((p) => file.external.url.startsWith(p));
+}
+
 /** A pending Notion write, run later in budget order. */
 type Write = () => Promise<unknown>;
 
@@ -237,18 +284,29 @@ export async function syncRepos(env: Env, now = new Date()): Promise<void> {
   for (const repo of allRepos) {
     const key = repo.nameWithOwner.toLowerCase();
     const properties = repoProperties(repo, rowIds);
-    const props = JSON.stringify(properties);
     const page = rows.get(key);
+    // An icon or cover you picked yourself is never replaced.
+    const icon = !page || ownedBySync(page.icon, [FAVICON, AVATAR]) ? repoIcon(repo) : undefined;
+    const cover = !page || ownedBySync(page.cover, COVERS) ? repoCover(repo) : undefined;
+    const props = JSON.stringify([properties, icon?.external.url, cover?.external.url]);
     if (page && snapshot[key] === props) continue;
     const synced = { "Last synced": { date: { start: nowIso } } };
     repoWrites.push({
       key,
       props,
       write: page
-        ? () => notion.pages.update({ page_id: page.id, properties: { ...properties, ...synced } })
+        ? () =>
+            notion.pages.update({
+              page_id: page.id,
+              ...(icon && { icon }),
+              ...(cover !== undefined && { cover }),
+              properties: { ...properties, ...synced },
+            })
         : () =>
             notion.pages.create({
               parent: { data_source_id: reposSource },
+              icon,
+              cover,
               properties: {
                 Name: { title: [{ text: { content: repo.name } }] },
                 Key: richText(repo.nameWithOwner),

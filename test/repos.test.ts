@@ -21,7 +21,7 @@ function repo(nameWithOwner: string, extra: Partial<Repo> = {}): Repo {
     isPrivate: false,
     isArchived: false,
     isFork: false,
-    owner: { login: owner },
+    owner: { login: owner, avatarUrl: `https://avatars.githubusercontent.com/u/1?v=4` },
     parent: null,
     stargazerCount: 7,
     forkCount: 1,
@@ -42,6 +42,7 @@ function repo(nameWithOwner: string, extra: Partial<Repo> = {}): Repo {
       url: "https://github.com/x/r",
       publishedAt: "2026-10-01T00:00:00Z",
     },
+    openGraphImageUrl: "https://opengraph.githubassets.com/1/x",
     ...extra,
   };
 }
@@ -142,6 +143,38 @@ describe("syncRepos", () => {
       "Last synced": { date: { start: "2026-11-05T00:00:00.000Z" } },
     });
     expect(update("page-old")).toEqual({ Status: { status: { name: "Deprecated" } } });
+
+    // Private repo: owner avatar. Public repo with a homepage: its favicon.
+    expect(created[0]?.body["icon"]).toEqual({
+      type: "external",
+      external: { url: "https://avatars.githubusercontent.com/u/1?v=4" },
+    });
+    const sitePatch = all.find((w) => w.method === "PATCH" && w.path.endsWith("page-site"));
+    expect(sitePatch?.body["icon"]).toEqual({
+      type: "external",
+      external: { url: "https://www.google.com/s2/favicons?sz=128&domain=acme.dev" },
+    });
+    // Public repo: its social preview. Private repo: no cover.
+    expect(sitePatch?.body["cover"]).toEqual({
+      type: "external",
+      external: { url: "https://opengraph.githubassets.com/1/x" },
+    });
+    expect(created[0]?.body["cover"]).toBeNull();
+  });
+
+  it("keeps an icon you picked yourself", async () => {
+    const [saved] = ROWS["repos-ds"];
+    if (!saved) throw new Error("fixture missing");
+    ROWS["repos-ds"][0] = { ...saved, icon: { type: "emoji", emoji: "🚀" } } as typeof saved;
+    try {
+      const calls = fakeApis();
+      await syncRepos(env);
+      const patch = (await writes(calls)).find((w) => w.path.endsWith("page-site"));
+      expect(patch?.body["properties"]).toBeDefined();
+      expect(patch?.body).not.toHaveProperty("icon");
+    } finally {
+      ROWS["repos-ds"][0] = saved;
+    }
   });
 
   it("keeps Notion keys out of the query text", async () => {

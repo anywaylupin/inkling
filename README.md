@@ -77,6 +77,9 @@ Repos rows are keyed by Key, written as `owner/repo`:
 - Rows whose Key names a repo you do not own are updated too, so you can track open-source projects.
 - A repo that disappears, or that GitHub archives, gets Status Deprecated. Rows are never deleted.
 - Sync writes Description, GitHub, Domain, Topics, Language, Visibility, Stars, Fork count, Open PRs, Open issues, Default branch, Last commit, Commit message, Latest release, Released, Forked from and Last synced. Name, Origin, Status and your relations stay yours after the row exists.
+- The page icon is the homepage favicon for a public repo with a homepage, fetched through Google's favicon service, and the owner's GitHub avatar otherwise.
+  The cover is the repo's social preview, the one uploaded in repo settings or GitHub's generated card, for public repos only.
+  An icon or cover you set yourself is never replaced.
 - Only the latest commit on the default branch is kept.
 - A row is written only when one of its synced values changed, so Last synced is the last time something changed.
 
