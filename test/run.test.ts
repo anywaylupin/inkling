@@ -74,7 +74,7 @@ describe("run", () => {
     await run(testEnv, t0);
     let written = await patches(calls);
     expect(written.map((w) => w.page)).toEqual(["page-http", "page-github"]);
-    expect(await testEnv.INKLING_STATE.get("cursor")).toBe("github");
+    expect(await testEnv.PARA_STATE.get("cursor")).toBe("github");
     expect(written[0]?.properties).toEqual({
       Status: { status: { name: "Up" } },
       Deployment: { url: "https://example.com" },
@@ -102,7 +102,7 @@ describe("run", () => {
   });
 
   it("keeps going when a provider call fails and never logs the response", async () => {
-    await testEnv.INKLING_STATE.put("cursor", "http");
+    await testEnv.PARA_STATE.put("cursor", "http");
     const calls = mockFetch((url) => {
       if (url.pathname.endsWith("/query")) return Response.json(query);
       if (url.hostname === "api.notion.com") return Response.json({ object: "page" });

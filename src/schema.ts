@@ -7,12 +7,12 @@ export const NOTION_VERSION = "2026-03-11";
 export const STATUS_OPTIONS = ["Up", "Degraded", "Down", "Unknown"];
 
 /**
- * Properties inkling owns and `pnpm setup:notion` can create; every other property on the data source stays untouched.
+ * Properties PARA owns and `pnpm setup:notion` can create; every other property on the data source stays untouched.
  *
- * Status is also inkling-owned but missing here because the API cannot create status properties.
+ * Status is also PARA-owned but missing here because the API cannot create status properties.
  * This file has only type imports so `pnpm setup:notion` can load it with plain Node.
  */
-export const INKLING_PROPERTIES = {
+export const PARA_PROPERTIES = {
   Deployment: { url: {} },
   Domain: { url: {} },
   "Last deploy": { date: {} },

@@ -31,7 +31,7 @@ beforeAll(async () => {
   env = {
     ...testEnv,
     GCP_SA_KEY: JSON.stringify({
-      client_email: `inkling-${crypto.randomUUID()}@acme.iam.gserviceaccount.com`,
+      client_email: `para-${crypto.randomUUID()}@acme.iam.gserviceaccount.com`,
       private_key: pem,
       project_id: "acme",
     }),

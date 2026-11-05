@@ -5,14 +5,14 @@ import type { Env } from "../src/env";
 declare global {
   namespace Cloudflare {
     interface Env {
-      INKLING_STATE: KVNamespace;
+      PARA_STATE: KVNamespace;
     }
   }
 }
 
 /** Fake secrets only; real tokens never belong in tests. */
 export const testEnv: Env = {
-  INKLING_STATE: env.INKLING_STATE,
+  PARA_STATE: env.PARA_STATE,
   NOTION_TOKEN: "test-notion",
   NOTION_DATA_SOURCE_ID: "ds-1",
   GITHUB_TOKEN: "test-github",
@@ -20,7 +20,7 @@ export const testEnv: Env = {
   CF_ACCOUNT_ID: "acct-1",
   VERCEL_TOKEN: "test-vercel",
   RENDER_API_KEY: "test-render",
-  ALERT_URL: "https://ntfy.sh/inkling-test",
+  ALERT_URL: "https://ntfy.sh/para-test",
 };
 
 /** Routes every outbound fetch to `handler` and records each request, so no test reaches a real API. */

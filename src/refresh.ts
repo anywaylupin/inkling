@@ -34,7 +34,7 @@ export async function handleRefresh(
   ctx: ExecutionContext,
 ): Promise<Response> {
   if (!env.REFRESH_SECRET) return new Response("Not found", { status: 404 });
-  if (!sameSecret(request.headers.get("x-inkling-key"), env.REFRESH_SECRET)) {
+  if (!sameSecret(request.headers.get("x-para-key"), env.REFRESH_SECRET)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
   const pageId = pageIdFrom(await request.json().catch(() => undefined));

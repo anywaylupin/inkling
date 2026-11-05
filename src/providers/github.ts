@@ -35,7 +35,7 @@ export const github: Provider = {
       authorization: `Bearer ${env.GITHUB_TOKEN}`,
       accept: "application/vnd.github+json",
       "x-github-api-version": "2022-11-28",
-      "user-agent": "inkling",
+      "user-agent": "para",
     };
     const { default_branch, homepage } = await getJson<{
       default_branch: string;

@@ -4,7 +4,7 @@
  * Provider secrets are optional so a missing one turns its rows Unknown instead of failing the run.
  */
 export interface Env {
-  INKLING_STATE: KVNamespace;
+  PARA_STATE: KVNamespace;
   NOTION_TOKEN: string;
   NOTION_DATA_SOURCE_ID: string;
   GITHUB_TOKEN?: string;

@@ -56,7 +56,7 @@ async function alert(env: Env, row: Row, from: string, to: string): Promise<void
   try {
     const res = await fetch(env.ALERT_URL, {
       method: "POST",
-      headers: { title: "inkling", tags: to === "Up" ? "white_check_mark" : "warning" },
+      headers: { title: "PARA", tags: to === "Up" ? "white_check_mark" : "warning" },
       body: `${row.name || row.resourceId} is ${to}, was ${from}`,
     });
     await res.body?.cancel();
@@ -110,7 +110,7 @@ async function updateRow(
 
 /** Reads one provider's snapshots from KV. */
 async function readSnapshots(env: Env, providerId: ProviderId): Promise<Record<string, Snapshot>> {
-  return (await env.INKLING_STATE.get(`snapshot:${providerId}`, "json")) ?? {};
+  return (await env.PARA_STATE.get(`snapshot:${providerId}`, "json")) ?? {};
 }
 
 /**
@@ -155,12 +155,12 @@ export async function run(env: Env, now = new Date()): Promise<void> {
   const present = PROVIDER_IDS.filter((id) => rows.some((row) => row.provider === id));
   const picked = pickProviders(
     present,
-    await env.INKLING_STATE.get("cursor"),
+    await env.PARA_STATE.get("cursor"),
     (id) => rows.filter((row) => row.provider === id).length,
   );
   const last = picked.at(-1);
   if (!last) return;
-  await env.INKLING_STATE.put("cursor", last);
+  await env.PARA_STATE.put("cursor", last);
 
   const context = { env, notion, now, write: throttle(334) };
   for (const providerId of picked) {
@@ -171,7 +171,7 @@ export async function run(env: Env, now = new Date()): Promise<void> {
       if (next) after[row.id] = next;
     }
     if (JSON.stringify(after) !== JSON.stringify(before)) {
-      await env.INKLING_STATE.put(`snapshot:${providerId}`, JSON.stringify(after));
+      await env.PARA_STATE.put(`snapshot:${providerId}`, JSON.stringify(after));
     }
   }
 }
@@ -187,5 +187,5 @@ export async function refreshRow(env: Env, row: Row, now = new Date()): Promise<
   const next = await updateRow(context, row, snapshots[row.id], true);
   if (!next) return;
   snapshots[row.id] = next;
-  await env.INKLING_STATE.put(`snapshot:${row.provider}`, JSON.stringify(snapshots));
+  await env.PARA_STATE.put(`snapshot:${row.provider}`, JSON.stringify(snapshots));
 }

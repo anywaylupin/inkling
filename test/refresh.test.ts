@@ -20,9 +20,9 @@ function page(dataSourceId = "ds-1") {
 
 /** A refresh request shaped like a Notion button webhook. */
 function webhook(key = "test-refresh-secret") {
-  return new Request("https://inkling.test/refresh", {
+  return new Request("https://para.test/refresh", {
     method: "POST",
-    headers: { "x-inkling-key": key, "content-type": "application/json" },
+    headers: { "x-para-key": key, "content-type": "application/json" },
     body: JSON.stringify({ source: { type: "automation" }, data: { object: "page", id: PAGE_ID } }),
   });
 }
@@ -47,7 +47,7 @@ describe("refresh", () => {
       Status: { status: { name: "Up" } },
       "Last checked": { date: {} },
     });
-    const snapshots = await env.INKLING_STATE.get<Record<string, unknown>>("snapshot:http", "json");
+    const snapshots = await env.PARA_STATE.get<Record<string, unknown>>("snapshot:http", "json");
     expect(snapshots?.[PAGE_ID]).toMatchObject({ status: "Up" });
   });
 
@@ -55,9 +55,9 @@ describe("refresh", () => {
     mockFetch((url) =>
       url.hostname === "api.notion.com" ? Response.json(page()) : new Response("ok"),
     );
-    const request = new Request("https://inkling.test/refresh", {
+    const request = new Request("https://para.test/refresh", {
       method: "POST",
-      headers: { "x-inkling-key": "test-refresh-secret" },
+      headers: { "x-para-key": "test-refresh-secret" },
       body: JSON.stringify({ page_id: PAGE_ID }),
     });
     const ctx = createExecutionContext();
@@ -109,9 +109,9 @@ describe("refresh", () => {
   });
 
   it("refuses a body without a page id", async () => {
-    const request = new Request("https://inkling.test/refresh", {
+    const request = new Request("https://para.test/refresh", {
       method: "POST",
-      headers: { "x-inkling-key": "test-refresh-secret" },
+      headers: { "x-para-key": "test-refresh-secret" },
       body: "not json",
     });
     expect((await handleRefresh(request, env, createExecutionContext())).status).toBe(400);

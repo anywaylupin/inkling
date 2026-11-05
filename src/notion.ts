@@ -10,7 +10,7 @@ import type { Env } from "./env";
 import { PROVIDER_IDS, type Check, type ProviderId } from "./providers";
 import { NOTION_VERSION } from "./schema";
 
-/** A monitored row with the fields inkling needs to check it. */
+/** A monitored row with the fields PARA needs to check it. */
 export interface Row {
   id: string;
   name: string;
@@ -45,7 +45,7 @@ function text(prop: PageObjectResponse["properties"][string] | undefined): strin
   return "";
 }
 
-/** True when the Provider select holds a value inkling has an adapter for. */
+/** True when the Provider select holds a value PARA has an adapter for. */
 function isProviderId(value: string): value is ProviderId {
   return PROVIDER_IDS.some((id) => id === value);
 }
@@ -84,7 +84,7 @@ function sameId(a: string, b: string): boolean {
 /**
  * Reads one monitored row of the configured data source, or undefined when the page is missing, elsewhere or not monitored.
  *
- * The parent check stops a valid caller from pointing inkling at another page the connection can see.
+ * The parent check stops a valid caller from pointing PARA at another page the connection can see.
  */
 export async function retrieveRow(
   notion: Client,
@@ -114,7 +114,7 @@ function richText(value: string, link?: string) {
 }
 
 /**
- * Maps a Check onto inkling-owned properties, filling defaults so no column is ever left empty.
+ * Maps a Check onto PARA-owned properties, filling defaults so no column is ever left empty.
  *
  * Last checked is only sent when `checkedAt` is given.
  * Without a known deploy, Last deploy copies Last checked and Deploy state says so, rather than leaving a blank date.
