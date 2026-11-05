@@ -6,7 +6,11 @@
 export interface Env {
   PARA_STATE: KVNamespace;
   NOTION_TOKEN: string;
-  NOTION_DATA_SOURCE_ID: string;
+  INFRA_DATA_SOURCE_ID: string;
+  /** Turns on the GitHub repo sync; without it the repo cron does nothing. */
+  REPOS_DATA_SOURCE_ID?: string;
+  /** Where open pull requests become tasks; without it the repo sync skips pull requests. */
+  TASKS_DATA_SOURCE_ID?: string;
   GITHUB_TOKEN?: string;
   CF_API_TOKEN?: string;
   CF_ACCOUNT_ID?: string;

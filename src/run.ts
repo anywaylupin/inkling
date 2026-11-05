@@ -151,7 +151,7 @@ export function pickProviders(
  */
 export async function run(env: Env, now = new Date()): Promise<void> {
   const notion = notionClient(env);
-  const rows = await queryMonitored(notion, env.NOTION_DATA_SOURCE_ID);
+  const rows = await queryMonitored(notion, env.INFRA_DATA_SOURCE_ID);
   const present = PROVIDER_IDS.filter((id) => rows.some((row) => row.provider === id));
   const picked = pickProviders(
     present,

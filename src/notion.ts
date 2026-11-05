@@ -37,7 +37,7 @@ export function notionClient(env: Env): Client {
  *
  * Formulas let Provider and Resource ID be derived from relations instead of typed by hand.
  */
-function text(prop: PageObjectResponse["properties"][string] | undefined): string {
+export function text(prop: PageObjectResponse["properties"][string] | undefined): string {
   if (prop?.type === "title") return prop.title.map((t) => t.plain_text).join("");
   if (prop?.type === "rich_text") return prop.rich_text.map((t) => t.plain_text).join("");
   if (prop?.type === "select") return prop.select?.name ?? "";
@@ -51,7 +51,7 @@ function isProviderId(value: string): value is ProviderId {
 }
 
 /** Turns a page into a Row, or undefined unless Monitor is ticked and Provider and Resource ID are set. */
-function toRow(page: PageObjectResponse): Row | undefined {
+export function toRow(page: PageObjectResponse): Row | undefined {
   const monitor = page.properties["Monitor"];
   const provider = text(page.properties["Provider"]);
   const resourceId = text(page.properties["Resource ID"]).trim();
@@ -77,26 +77,21 @@ export async function queryMonitored(notion: Client, dataSourceId: string): Prom
 }
 
 /** Notion returns ids with or without dashes depending on the endpoint. */
-function sameId(a: string, b: string): boolean {
+export function sameId(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return false;
   return a.replaceAll("-", "").toLowerCase() === b.replaceAll("-", "").toLowerCase();
 }
 
-/**
- * Reads one monitored row of the configured data source, or undefined when the page is missing, elsewhere or not monitored.
- *
- * The parent check stops a valid caller from pointing PARA at another page the connection can see.
- */
-export async function retrieveRow(
+/** Reads a page and the data source it lives in, or undefined when it is missing, trashed or not a database row. */
+export async function retrievePage(
   notion: Client,
-  dataSourceId: string,
   pageId: string,
-): Promise<Row | undefined> {
+): Promise<{ page: PageObjectResponse; dataSourceId: string } | undefined> {
   try {
     const page = await notion.pages.retrieve({ page_id: pageId });
     if (!isFullPage(page) || page.in_trash) return undefined;
     if (page.parent.type !== "data_source_id") return undefined;
-    if (!sameId(page.parent.data_source_id, dataSourceId)) return undefined;
-    return toRow(page);
+    return { page, dataSourceId: page.parent.data_source_id };
   } catch (error) {
     const missing = [APIErrorCode.ObjectNotFound, APIErrorCode.ValidationError];
     if (isNotionClientError(error) && missing.some((code) => code === error.code)) return undefined;

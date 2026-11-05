@@ -1,5 +1,6 @@
 import type { Env } from "./env";
-import { notionClient, retrieveRow } from "./notion";
+import { notionClient, retrievePage, sameId, toRow } from "./notion";
+import { syncRepos } from "./repos";
 import { syncRow } from "./run";
 
 /** Compares in constant time so response timing never leaks how much of the key matched. */
@@ -23,10 +24,12 @@ function pageIdFrom(body: unknown): string | undefined {
 }
 
 /**
- * Handles `POST /sync`: checks one row now instead of waiting for its provider's cron turn.
+ * Handles `POST /sync`: syncs the page's data source now instead of waiting for its cron turn.
  *
- * The check runs after the response because Notion button webhooks expect a quick answer and an http check can take 20 s.
+ * An Infra row is checked on its own; a Repos or Tasks row runs the whole repo sync, which costs about the same.
+ * The work runs after the response because Notion button webhooks expect a quick answer and an http check can take 20 s.
  * Without SYNC_SECRET the route answers 404, so the endpoint is off until you opt in.
+ * The parent check stops a valid caller from pointing PARA at another page the connection can see.
  */
 export async function handleSync(
   request: Request,
@@ -41,8 +44,17 @@ export async function handleSync(
   if (!pageId) {
     return Response.json({ error: "Send page_id or a Notion webhook body" }, { status: 400 });
   }
-  const row = await retrieveRow(notionClient(env), env.NOTION_DATA_SOURCE_ID, pageId);
-  if (!row) return Response.json({ error: "No monitored row with that id" }, { status: 404 });
+  const found = await retrievePage(notionClient(env), pageId);
+  const source = found?.dataSourceId;
+  if (
+    sameId(source, env.REPOS_DATA_SOURCE_ID) ||
+    (env.REPOS_DATA_SOURCE_ID && sameId(source, env.TASKS_DATA_SOURCE_ID))
+  ) {
+    ctx.waitUntil(syncRepos(env));
+    return Response.json({ syncing: pageId, source: "repos" }, { status: 202 });
+  }
+  const row = found && sameId(source, env.INFRA_DATA_SOURCE_ID) ? toRow(found.page) : undefined;
+  if (!row) return Response.json({ error: "No syncable row with that id" }, { status: 404 });
   ctx.waitUntil(syncRow(env, row));
   return Response.json({ syncing: row.id, provider: row.provider }, { status: 202 });
 }

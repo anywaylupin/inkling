@@ -1,6 +1,10 @@
 import type { Env } from "./env";
-import { handleSync } from "./sync";
+import { syncRepos } from "./repos";
 import { run } from "./run";
+import { handleSync } from "./sync";
+
+/** Must match the second cron in wrangler.jsonc; offset from the Infra cron so the two never share Notion's rate limit. */
+export const REPOS_CRON = "7,37 * * * *";
 
 export default {
   async fetch(request, env, ctx) {
@@ -12,7 +16,8 @@ export default {
     return new Response("Not found", { status: 404 });
   },
 
-  async scheduled(_controller, env) {
-    await run(env);
+  async scheduled(controller, env) {
+    if (controller.cron === REPOS_CRON) await syncRepos(env);
+    else await run(env);
   },
 } satisfies ExportedHandler<Env>;

@@ -14,7 +14,7 @@ declare global {
 export const testEnv: Env = {
   PARA_STATE: env.PARA_STATE,
   NOTION_TOKEN: "test-notion",
-  NOTION_DATA_SOURCE_ID: "ds-1",
+  INFRA_DATA_SOURCE_ID: "ds-1",
   GITHUB_TOKEN: "test-github",
   CF_API_TOKEN: "test-cloudflare",
   CF_ACCOUNT_ID: "acct-1",

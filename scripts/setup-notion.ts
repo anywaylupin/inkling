@@ -1,14 +1,14 @@
 import { Client } from "@notionhq/client";
 import { PARA_PROPERTIES, NOTION_VERSION, STATUS_OPTIONS } from "../src/schema.ts";
 
-const { NOTION_TOKEN, NOTION_DATA_SOURCE_ID } = process.env;
-if (!NOTION_TOKEN || !NOTION_DATA_SOURCE_ID) {
-  console.error("Set NOTION_TOKEN and NOTION_DATA_SOURCE_ID in .dev.vars first.");
+const { NOTION_TOKEN, INFRA_DATA_SOURCE_ID } = process.env;
+if (!NOTION_TOKEN || !INFRA_DATA_SOURCE_ID) {
+  console.error("Set NOTION_TOKEN and INFRA_DATA_SOURCE_ID in .dev.vars first.");
   process.exit(1);
 }
 
 const notion = new Client({ auth: NOTION_TOKEN, notionVersion: NOTION_VERSION });
-const source = await notion.dataSources.retrieve({ data_source_id: NOTION_DATA_SOURCE_ID });
+const source = await notion.dataSources.retrieve({ data_source_id: INFRA_DATA_SOURCE_ID });
 const existing = "properties" in source ? source.properties : {};
 
 const missing = Object.entries(PARA_PROPERTIES).filter(([name]) => !(name in existing));
@@ -35,7 +35,7 @@ if (missing.length === 0) {
   console.log("All PARA properties already exist.");
 } else {
   await notion.dataSources.update({
-    data_source_id: NOTION_DATA_SOURCE_ID,
+    data_source_id: INFRA_DATA_SOURCE_ID,
     properties: Object.fromEntries(missing),
   });
   console.log(`Added ${missing.map(([name]) => name).join(", ")}.`);
