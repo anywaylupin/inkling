@@ -95,7 +95,7 @@ An Infra row is checked on its own; a Repos or Tasks row runs the whole repo syn
 It stays off until you set the `SYNC_SECRET` Worker secret to a long random string.
 
 Every request needs the header `x-para-key: <SYNC_SECRET>` and a JSON body that is either a Notion button webhook or `{ "page_id": "<page id>" }`.
-It answers 202 at once and updates the row a few seconds later.
+It answers 200 at once, because Notion buttons treat any other status as a failure, and updates the row a few seconds later.
 It refuses pages outside your Infra, Repos and Tasks data sources, and Infra rows without Monitor ticked.
 
 To add a sync button in Notion:

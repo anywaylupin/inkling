@@ -51,10 +51,10 @@ export async function handleSync(
     (env.REPOS_DATA_SOURCE_ID && sameId(source, env.TASKS_DATA_SOURCE_ID))
   ) {
     ctx.waitUntil(syncRepos(env));
-    return Response.json({ syncing: pageId, source: "repos" }, { status: 202 });
+    return Response.json({ syncing: pageId, source: "repos" }, { status: 200 });
   }
   const row = found && sameId(source, env.INFRA_DATA_SOURCE_ID) ? toRow(found.page) : undefined;
   if (!row) return Response.json({ error: "No syncable row with that id" }, { status: 404 });
   ctx.waitUntil(syncRow(env, row));
-  return Response.json({ syncing: row.id, provider: row.provider }, { status: 202 });
+  return Response.json({ syncing: row.id, provider: row.provider }, { status: 200 });
 }

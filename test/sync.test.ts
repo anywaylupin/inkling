@@ -36,7 +36,7 @@ describe("sync", () => {
     });
     const ctx = createExecutionContext();
     const res = await handleSync(webhook(), env, ctx);
-    expect(res.status).toBe(202);
+    expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ syncing: PAGE_ID, provider: "http" });
     await waitOnExecutionContext(ctx);
 
@@ -61,7 +61,7 @@ describe("sync", () => {
       body: JSON.stringify({ page_id: PAGE_ID }),
     });
     const ctx = createExecutionContext();
-    expect((await handleSync(request, env, ctx)).status).toBe(202);
+    expect((await handleSync(request, env, ctx)).status).toBe(200);
     await waitOnExecutionContext(ctx);
   });
 

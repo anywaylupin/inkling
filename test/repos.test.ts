@@ -219,7 +219,7 @@ describe("sync route on a Repos row", () => {
       env,
       ctx,
     );
-    expect(res.status).toBe(202);
+    expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ source: "repos" });
     await waitOnExecutionContext(ctx);
   });
