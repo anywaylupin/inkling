@@ -82,7 +82,10 @@ function fakeApis(graphqlErrors = false) {
               login: "acme",
               repositories: {
                 pageInfo: { hasNextPage: false, endCursor: null },
-                nodes: [repo("acme/site"), repo("acme/new", { isPrivate: true })],
+                nodes: [
+                  repo("acme/site", { i17: { id: "blob" } }),
+                  repo("acme/new", { isPrivate: true, i0: { id: "blob" } }),
+                ],
               },
             },
           },
@@ -144,7 +147,7 @@ describe("syncRepos", () => {
     });
     expect(update("page-old")).toEqual({ Status: { status: { name: "Deprecated" } } });
 
-    // Private repo: owner avatar. Public repo with a homepage: its favicon.
+    // Private repo: owner avatar even with an icon file. Public repo: its app/favicon.ico.
     expect(created[0]?.body["icon"]).toEqual({
       type: "external",
       external: { url: "https://avatars.githubusercontent.com/u/1?v=4" },
@@ -152,7 +155,7 @@ describe("syncRepos", () => {
     const sitePatch = all.find((w) => w.method === "PATCH" && w.path.endsWith("page-site"));
     expect(sitePatch?.body["icon"]).toEqual({
       type: "external",
-      external: { url: "https://www.google.com/s2/favicons?sz=128&domain=acme.dev" },
+      external: { url: "https://raw.githubusercontent.com/acme/site/main/app/favicon.ico" },
     });
     // Public repo: its social preview. Private repo: no cover.
     expect(sitePatch?.body["cover"]).toEqual({

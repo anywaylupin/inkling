@@ -26,6 +26,36 @@ const WRITE_BUDGET = 35;
  */
 const MAX_LOOKUPS = 100;
 
+/**
+ * Icon files that common frameworks expect, best first: square PNGs, then SVGs, then .ico.
+ *
+ * Covers Next.js app router (app/, src/app/), public/ folders (Next.js pages, Vite, CRA, Astro, Nuxt), SvelteKit static/ and repo roots.
+ * shortcut: fixed paths; a repo keeping its logo elsewhere falls back to the owner's avatar.
+ */
+const ICON_PATHS = [
+  "app/apple-icon.png",
+  "src/app/apple-icon.png",
+  "public/apple-touch-icon.png",
+  "app/icon.png",
+  "src/app/icon.png",
+  "public/logo192.png",
+  "public/icon.png",
+  "public/logo.png",
+  "static/favicon.png",
+  "logo.png",
+  "app/icon.svg",
+  "src/app/icon.svg",
+  "public/icon.svg",
+  "public/logo.svg",
+  "public/favicon.svg",
+  "static/favicon.svg",
+  "logo.svg",
+  "app/favicon.ico",
+  "src/app/favicon.ico",
+  "public/favicon.ico",
+  "favicon.ico",
+] as const;
+
 const REPO_FIELDS = `
   nameWithOwner name description url homepageUrl isPrivate isArchived isFork
   owner { login avatarUrl }
@@ -37,7 +67,8 @@ const REPO_FIELDS = `
   issues(states: OPEN) { totalCount }
   defaultBranchRef { name target { ... on Commit { committedDate messageHeadline url } } }
   latestRelease { tagName url publishedAt }
-  openGraphImageUrl`;
+  openGraphImageUrl
+  ${ICON_PATHS.map((path, i) => `i${i}: object(expression: "HEAD:${path}") { id }`).join("\n  ")}`;
 
 export interface Repo {
   nameWithOwner: string;
@@ -62,6 +93,8 @@ export interface Repo {
   } | null;
   latestRelease: { tagName: string; url: string; publishedAt: string | null } | null;
   openGraphImageUrl: string;
+  /** One per ICON_PATHS entry, null when that file is missing. */
+  [icon: `i${number}`]: { id: string } | null | undefined;
 }
 
 /** Posts one GraphQL query; a null alias with a NOT_FOUND error means that repo is gone. */
@@ -198,24 +231,23 @@ export function repoProperties(
   };
 }
 
-const FAVICON = "https://www.google.com/s2/favicons?sz=128&domain=";
+/** Icon hosts PARA has used, so sync knows which icons it may replace; FAVICON is the retired homepage-favicon service. */
+const FAVICON = "https://www.google.com/s2/favicons";
 const AVATAR = "https://avatars.githubusercontent.com/";
+const RAW = "https://raw.githubusercontent.com/";
 
 /**
- * The page icon: the homepage favicon for a public repo with a homepage, otherwise the owner's avatar.
+ * The page icon: the first ICON_PATHS file in a public repo, otherwise the owner's avatar.
  *
- * Private homepages fall back to the avatar so their domain never reaches the favicon service.
- * shortcut: a site without a favicon shows the service's globe, not the avatar; fetch the favicon once per repo to tell them apart.
+ * Private repos always get the avatar, because raw file links need a GitHub session for them.
  */
 export function repoIcon(repo: Repo): { type: "external"; external: { url: string } } {
-  let url = repo.owner.avatarUrl;
-  if (!repo.isPrivate && repo.homepageUrl) {
-    try {
-      url = FAVICON + new URL(repo.homepageUrl).hostname;
-    } catch {
-      // A malformed homepage keeps the avatar.
-    }
-  }
+  const path = ICON_PATHS.find((_, i) => repo[`i${i}`]);
+  const branch = repo.defaultBranchRef?.name;
+  const url =
+    !repo.isPrivate && path && branch
+      ? `${RAW}${repo.nameWithOwner}/${encodeURIComponent(branch)}/${path}`
+      : repo.owner.avatarUrl;
   return { type: "external", external: { url } };
 }
 
@@ -286,7 +318,8 @@ export async function syncRepos(env: Env, now = new Date()): Promise<void> {
     const properties = repoProperties(repo, rowIds);
     const page = rows.get(key);
     // An icon or cover you picked yourself is never replaced.
-    const icon = !page || ownedBySync(page.icon, [FAVICON, AVATAR]) ? repoIcon(repo) : undefined;
+    const icon =
+      !page || ownedBySync(page.icon, [FAVICON, AVATAR, RAW]) ? repoIcon(repo) : undefined;
     const cover = !page || ownedBySync(page.cover, COVERS) ? repoCover(repo) : undefined;
     const props = JSON.stringify([properties, icon?.external.url, cover?.external.url]);
     if (page && snapshot[key] === props) continue;
