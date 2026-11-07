@@ -98,7 +98,9 @@ Rows with Kind `Skill` or `Plugin` and a GitHub Source are synced:
 - Source is `owner/repo`, or a GitHub URL to the repo or to one folder, such as `https://github.com/owner/repo/tree/main/skills/pdf`.
 - A Skill is read from `SKILL.md`, looked up in `skills/<Slug>/`, `<Slug>/` and `.claude/skills/<Slug>/`, or at the repo root when Slug is empty.
 - A Plugin is read from `.claude-plugin/plugin.json`, looked up in `plugins/<Slug>/`, `<Slug>/` and the repo root. Its marketplace name comes from the repo's `.claude-plugin/marketplace.json`.
-- Sync writes Description and Version from the manifest, GitHub as the folder link and Stars from the repo. It fills Slug and Marketplace only when they are empty.
+- Sync writes Description and Version from the manifest, and GitHub (the repo link), Domain (its homepage) and Stars from the repo. It fills Slug and Marketplace only when they are empty.
+- Agents lists the agents the repo ships config for, read from root files such as `.claude-plugin` or `CLAUDE.md` (Claude Code), `.codex-plugin` (Codex), `.cursor` (Cursor), `gemini-extension.json` (Gemini CLI), `.windsurf`, `.clinerules`, `.opencode` and `.kiro`. It is written only when at least one is found, so you can tag a bare repo by hand.
+- Marketplace is the Claude Code plugin marketplace name that `/plugin install <plugin>@<marketplace>` needs. Version is the manifest's version, so you can tell when an installed plugin is out of date.
 - A row is written only when one of those values differs. Rows whose manifest is not found, and other Kinds, are left alone.
 
 The Install formula builds the command to copy:
@@ -106,7 +108,7 @@ The Install formula builds the command to copy:
 - Skill: `npx skills add <Source> --skill <Slug>`, with `-g -a claude-code` for Claude global (the default), `-a claude-code` for Claude project, or `-g` for All agents.
 - Plugin: `/plugin marketplace add <Source>` then `/plugin install <Slug>@<Marketplace>`, to paste into Claude Code.
 
-The columns are Kind (select: Skill, Plugin, MCP server, Agent), Source, Slug, Marketplace, Version and Description (text), GitHub (url), Stars (number), Install scope (select) and Install (formula).
+The columns are Kind (select: Skill, Plugin, MCP server, Agent), Source, Slug, Marketplace, Version and Description (text), GitHub and Domain (url), Agents (multi-select), Stars (number), Install scope (select) and Install (formula).
 
 ## Sync a row now
 

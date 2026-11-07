@@ -31,10 +31,41 @@ interface Target {
   branch?: string;
 }
 
+/**
+ * Root files or folders that show a repo ships config for an agent; the first matching name wins for each agent.
+ *
+ * shortcut: root entries only, so a repo that keeps agent config in a subfolder is not detected; add paths here when one turns up.
+ */
+const AGENT_MARKERS: Record<string, string> = {
+  ".claude-plugin": "Claude Code",
+  ".claude": "Claude Code",
+  "CLAUDE.md": "Claude Code",
+  ".codex-plugin": "Codex",
+  ".codex": "Codex",
+  ".cursor": "Cursor",
+  ".cursor-plugin": "Cursor",
+  ".cursorrules": "Cursor",
+  "gemini-extension.json": "Gemini CLI",
+  ".gemini": "Gemini CLI",
+  ".windsurf": "Windsurf",
+  ".windsurfrules": "Windsurf",
+  ".clinerules": "Cline",
+  ".opencode": "OpenCode",
+  "opencode.json": "OpenCode",
+  ".kiro": "Kiro",
+};
+
+/** The agents a repo ships config for, in a stable order, from its root entry names. */
+export function agentsOf(entries: string[]): string[] {
+  return [...new Set(entries.flatMap((name) => AGENT_MARKERS[name] ?? []))].sort();
+}
+
 interface FoundRepo {
   url: string;
+  homepageUrl: string | null;
   stargazerCount: number;
   defaultBranchRef: { name: string } | null;
+  root?: { entries: { name: string }[] } | null;
   m?: { text: string | null } | null;
   [file: `f${number}`]: { text: string | null } | null | undefined;
 }
@@ -114,7 +145,8 @@ function marketplaceName(json: string | null | undefined): string | undefined {
  * Fills Skills rows whose Kind is Skill or Plugin and whose Source points at GitHub.
  *
  * From SKILL.md or .claude-plugin/plugin.json: Description and Version, and Slug when empty.
- * From the repo: GitHub (the folder link), Stars, and Marketplace for plugins when empty. The page icon is never touched.
+ * From the repo: GitHub (the repo link), Domain (its homepage), Stars, Agents (from root config files such as .claude-plugin or .codex-plugin),
+ * and Marketplace for plugins when empty. The page icon is never touched.
  * A row is written only when one of those values differs.
  */
 export async function syncSkills(env: Env): Promise<void> {
@@ -138,7 +170,8 @@ export async function syncSkills(env: Env): Promise<void> {
     const ref = t.branch ?? "HEAD";
     variables[`o${i}`] = t.owner;
     variables[`n${i}`] = t.repo;
-    defs.push(`$o${i}: String!`, `$n${i}: String!`);
+    variables[`r${i}`] = `${ref}:`;
+    defs.push(`$o${i}: String!`, `$n${i}: String!`, `$r${i}: String!`);
     const files = t.folders.map((folder, j) => {
       variables[`e${i}_${j}`] = `${ref}:${folder ? `${folder}/` : ""}${MANIFEST[t.kind]}`;
       defs.push(`$e${i}_${j}: String!`);
@@ -150,7 +183,7 @@ export async function syncSkills(env: Env): Promise<void> {
       files.push(`m: object(expression: $m${i}) { ... on Blob { text } }`);
     }
     parts.push(
-      `s${i}: repository(owner: $o${i}, name: $n${i}) { url stargazerCount defaultBranchRef { name } ${files.join(" ")} }`,
+      `s${i}: repository(owner: $o${i}, name: $n${i}) { url homepageUrl stargazerCount defaultBranchRef { name } root: object(expression: $r${i}) { ... on Tree { entries { name } } } ${files.join(" ")} }`,
     );
   });
   const data = await graphql<Record<string, FoundRepo | null>>(
@@ -167,9 +200,7 @@ export async function syncSkills(env: Env): Promise<void> {
     const j = t.folders.findIndex((_, k) => repo[`f${k}`]?.text);
     const manifest = repo[`f${j}`]?.text;
     if (j < 0 || !manifest) continue;
-    const folder = t.folders[j] ?? "";
-    const branch = t.branch ?? repo.defaultBranchRef?.name ?? "HEAD";
-    const github = folder ? `${repo.url}/tree/${branch}/${folder}` : repo.url;
+    const agents = agentsOf(repo.root?.entries.map((e) => e.name) ?? []);
     const meta = t.kind === "Skill" ? frontmatter(manifest) : pluginManifest(manifest);
     const marketplace = t.kind === "Plugin" ? marketplaceName(repo.m?.text) : undefined;
 
@@ -185,8 +216,18 @@ export async function syncSkills(env: Env): Promise<void> {
     setText("Version", meta.version);
     setText("Slug", meta.name, true);
     setText("Marketplace", marketplace, true);
-    if (props["GitHub"]?.type === "url" && props["GitHub"].url !== github) {
-      properties["GitHub"] = { url: github };
+    if (props["GitHub"]?.type === "url" && props["GitHub"].url !== repo.url) {
+      properties["GitHub"] = { url: repo.url };
+    }
+    const domain = repo.homepageUrl || null;
+    if (props["Domain"]?.type === "url" && props["Domain"].url !== domain) {
+      properties["Domain"] = { url: domain };
+    }
+    // Only written when some agent is detected, so agents you pick by hand for a bare repo stay.
+    const current = props["Agents"]?.type === "multi_select" ? props["Agents"].multi_select : [];
+    const have = current.map((o) => o.name).sort();
+    if (agents.length > 0 && have.join() !== agents.join()) {
+      properties["Agents"] = { multi_select: agents.map((name) => ({ name })) };
     }
     if (props["Stars"]?.type === "number" && props["Stars"].number !== repo.stargazerCount) {
       properties["Stars"] = { number: repo.stargazerCount };

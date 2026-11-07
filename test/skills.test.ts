@@ -1,7 +1,7 @@
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import type { PageObjectResponse } from "@notionhq/client";
 import { describe, expect, it } from "vitest";
-import { frontmatter, pluginManifest, syncSkills, targetOf } from "../src/skills";
+import { agentsOf, frontmatter, pluginManifest, syncSkills, targetOf } from "../src/skills";
 import { handleSync } from "../src/sync";
 import { mockFetch, testEnv } from "./helpers";
 
@@ -29,6 +29,8 @@ function row(id: string, fields: { source: string; slug?: string; kind?: string;
       Version: rt(),
       Marketplace: rt(),
       GitHub: { type: "url", url: null as string | null },
+      Domain: { type: "url", url: null as string | null },
+      Agents: { type: "multi_select", multi_select: [] as { name: string }[] },
       Stars: { type: "number", number: null as number | null },
     },
   };
@@ -55,7 +57,9 @@ function fakeApis(rows: unknown[]) {
         data: {
           s0: {
             url: "https://github.com/acme/agent-skills",
+            homepageUrl: null,
             stargazerCount: 12,
+            root: { entries: [{ name: "skills" }, { name: "README.md" }] },
             defaultBranchRef: { name: "main" },
             f0: null,
             f1: { text: SKILL_MD },
@@ -64,7 +68,16 @@ function fakeApis(rows: unknown[]) {
           s1: null,
           s2: {
             url: "https://github.com/acme/ponytail",
+            homepageUrl: "https://ponytail.dev",
             stargazerCount: 7,
+            root: {
+              entries: [
+                { name: ".claude-plugin" },
+                { name: ".codex-plugin" },
+                { name: "gemini-extension.json" },
+                { name: "CLAUDE.md" },
+              ],
+            },
             defaultBranchRef: { name: "main" },
             f0: { text: PLUGIN_JSON },
             m: { text: MARKETPLACE_JSON },
@@ -128,6 +141,15 @@ describe("targetOf", () => {
   });
 });
 
+describe("agentsOf", () => {
+  it("maps root config files to agents, once each, sorted", () => {
+    expect(
+      agentsOf([".codex-plugin", "CLAUDE.md", ".claude-plugin", ".windsurf", "README.md"]),
+    ).toEqual(["Claude Code", "Codex", "Windsurf"]);
+    expect(agentsOf(["src", "package.json"])).toEqual([]);
+  });
+});
+
 describe("manifests", () => {
   it("reads SKILL.md frontmatter, unquoted", () => {
     expect(frontmatter(SKILL_MD)).toEqual({
@@ -175,7 +197,7 @@ describe("syncSkills", () => {
     expect(written[0]?.body).toMatchObject({
       properties: {
         Description: { rich_text: [{ text: { content: "Build distinctive interfaces" } }] },
-        GitHub: { url: "https://github.com/acme/agent-skills/tree/main/frontend-design" },
+        GitHub: { url: "https://github.com/acme/agent-skills" },
         Stars: { number: 12 },
       },
     });
@@ -188,7 +210,11 @@ describe("syncSkills", () => {
       Slug: { rich_text: [{ text: { content: "ponytail" } }] },
       Marketplace: { rich_text: [{ text: { content: "ponytail-market" } }] },
       GitHub: { url: "https://github.com/acme/ponytail" },
+      Domain: { url: "https://ponytail.dev" },
       Stars: { number: 7 },
+      Agents: {
+        multi_select: [{ name: "Claude Code" }, { name: "Codex" }, { name: "Gemini CLI" }],
+      },
     });
 
     const query = calls.find((c) => c.url.includes("graphql"));
@@ -210,8 +236,7 @@ describe("syncSkills", () => {
       icon: { type: "emoji", emoji: "🎨" },
     });
     current.properties.Description = rt("Build distinctive interfaces");
-    current.properties.GitHub.url =
-      "https://github.com/acme/agent-skills/tree/main/frontend-design";
+    current.properties.GitHub.url = "https://github.com/acme/agent-skills";
     current.properties.Stars.number = 12;
     const calls = fakeApis([current]);
     await syncSkills(env);

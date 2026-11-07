@@ -68,6 +68,8 @@ export const MODULES: Record<
       Version: { rich_text: {} },
       Description: { rich_text: {} },
       GitHub: { url: {} },
+      Domain: { url: {} },
+      Agents: { multi_select: {} },
       Stars: { number: {} },
       "Install scope": select("Claude global", "Claude project", "All agents"),
       Install: { formula: { expression: INSTALL_FORMULA } },
