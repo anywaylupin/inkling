@@ -34,7 +34,6 @@ interface Target {
 interface FoundRepo {
   url: string;
   stargazerCount: number;
-  owner: { avatarUrl: string };
   defaultBranchRef: { name: string } | null;
   m?: { text: string | null } | null;
   [file: `f${number}`]: { text: string | null } | null | undefined;
@@ -115,7 +114,7 @@ function marketplaceName(json: string | null | undefined): string | undefined {
  * Fills Skills rows whose Kind is Skill or Plugin and whose Source points at GitHub.
  *
  * From SKILL.md or .claude-plugin/plugin.json: Description and Version, and Slug when empty.
- * From the repo: GitHub (the folder link), Stars, Marketplace for plugins when empty, and the owner's avatar as the icon when the page has none.
+ * From the repo: GitHub (the folder link), Stars, and Marketplace for plugins when empty. The page icon is never touched.
  * A row is written only when one of those values differs.
  */
 export async function syncSkills(env: Env): Promise<void> {
@@ -151,7 +150,7 @@ export async function syncSkills(env: Env): Promise<void> {
       files.push(`m: object(expression: $m${i}) { ... on Blob { text } }`);
     }
     parts.push(
-      `s${i}: repository(owner: $o${i}, name: $n${i}) { url stargazerCount owner { avatarUrl } defaultBranchRef { name } ${files.join(" ")} }`,
+      `s${i}: repository(owner: $o${i}, name: $n${i}) { url stargazerCount defaultBranchRef { name } ${files.join(" ")} }`,
     );
   });
   const data = await graphql<Record<string, FoundRepo | null>>(
@@ -192,15 +191,11 @@ export async function syncSkills(env: Env): Promise<void> {
     if (props["Stars"]?.type === "number" && props["Stars"].number !== repo.stargazerCount) {
       properties["Stars"] = { number: repo.stargazerCount };
     }
-    const icon = t.page.icon
-      ? undefined
-      : { type: "external" as const, external: { url: repo.owner.avatarUrl } };
-    if (Object.keys(properties).length === 0 && !icon) continue;
+    if (Object.keys(properties).length === 0) continue;
     if (budget-- <= 0) break;
     await write(() =>
       notion.pages.update({
         page_id: t.page.id,
-        ...(icon && { icon }),
         properties: properties as Parameters<typeof notion.pages.update>[0]["properties"],
       }),
     ).catch(logFailure);

@@ -99,7 +99,6 @@ Rows with Kind `Skill` or `Plugin` and a GitHub Source are synced:
 - A Skill is read from `SKILL.md`, looked up in `skills/<Slug>/`, `<Slug>/` and `.claude/skills/<Slug>/`, or at the repo root when Slug is empty.
 - A Plugin is read from `.claude-plugin/plugin.json`, looked up in `plugins/<Slug>/`, `<Slug>/` and the repo root. Its marketplace name comes from the repo's `.claude-plugin/marketplace.json`.
 - Sync writes Description and Version from the manifest, GitHub as the folder link and Stars from the repo. It fills Slug and Marketplace only when they are empty.
-- A page without an icon gets the repo owner's avatar.
 - A row is written only when one of those values differs. Rows whose manifest is not found, and other Kinds, are left alone.
 
 The Install formula builds the command to copy:

@@ -56,7 +56,6 @@ function fakeApis(rows: unknown[]) {
           s0: {
             url: "https://github.com/acme/agent-skills",
             stargazerCount: 12,
-            owner: { avatarUrl: "https://avatars.githubusercontent.com/u/9" },
             defaultBranchRef: { name: "main" },
             f0: null,
             f1: { text: SKILL_MD },
@@ -66,7 +65,6 @@ function fakeApis(rows: unknown[]) {
           s2: {
             url: "https://github.com/acme/ponytail",
             stargazerCount: 7,
-            owner: { avatarUrl: "https://avatars.githubusercontent.com/u/9" },
             defaultBranchRef: { name: "main" },
             f0: { text: PLUGIN_JSON },
             m: { text: MARKETPLACE_JSON },
@@ -172,8 +170,9 @@ describe("syncSkills", () => {
     const written = await patches(calls);
     expect(written.map((w) => w.path)).toEqual(["/v1/pages/skill-1", "/v1/pages/plugin-1"]);
 
+    // The page icon is never written.
+    expect(written[0]?.body).not.toHaveProperty("icon");
     expect(written[0]?.body).toMatchObject({
-      icon: { type: "external", external: { url: "https://avatars.githubusercontent.com/u/9" } },
       properties: {
         Description: { rich_text: [{ text: { content: "Build distinctive interfaces" } }] },
         GitHub: { url: "https://github.com/acme/agent-skills/tree/main/frontend-design" },
@@ -204,7 +203,7 @@ describe("syncSkills", () => {
     });
   });
 
-  it("writes nothing when every value already matches and the page has an icon", async () => {
+  it("writes nothing when every value already matches", async () => {
     const current = row("skill-1", {
       source: "acme/agent-skills",
       slug: "frontend-design",
