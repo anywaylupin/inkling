@@ -1,4 +1,4 @@
-import { dynamodb, lambda } from "./aws";
+import { amplify, apigateway, dynamodb, lambda } from "./aws";
 import { cloudflare } from "./cloudflare";
 import { github } from "./github";
 import { googleanalytics, googlecloud, googlegemini } from "./google";
@@ -18,6 +18,8 @@ export const providers = {
   neon,
   lambda,
   dynamodb,
+  apigateway,
+  amplify,
   mistral,
   googlegemini,
   googleanalytics,

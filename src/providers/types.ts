@@ -10,6 +10,8 @@ export const PROVIDER_IDS = [
   "neon",
   "lambda",
   "dynamodb",
+  "apigateway",
+  "amplify",
   "mistral",
   "googlegemini",
   "googleanalytics",

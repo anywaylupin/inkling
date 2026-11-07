@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dynamodb, lambda } from "../src/providers/aws";
+import { amplify, apigateway, dynamodb, lambda } from "../src/providers/aws";
 import table from "./fixtures/dynamodb-table.json";
 import functionUrl from "./fixtures/lambda-function-url.json";
 import fn from "./fixtures/lambda-function.json";
@@ -70,5 +70,113 @@ describe("dynamodb", () => {
   it("is Degraded while the table updates", async () => {
     mockFetch(() => Response.json({ Table: { ...table.Table, TableStatus: "UPDATING" } }));
     expect((await dynamodb.check("orders", env)).status).toBe("Degraded");
+  });
+});
+
+describe("apigateway", () => {
+  const httpApis = {
+    items: [
+      {
+        apiId: "h1",
+        name: "creative-preview",
+        apiEndpoint: "https://h1.execute-api.us-east-1.amazonaws.com",
+      },
+    ],
+  };
+  const restApis = { item: [{ id: "r1", name: "legacy" }] };
+
+  it("finds an HTTP API by name and reads its newest stage", async () => {
+    const calls = mockFetch(
+      routes({
+        "/v2/apis": httpApis,
+        "/restapis": restApis,
+        "/v2/apis/h1/stages": {
+          items: [
+            { stageName: "dev", lastUpdatedDate: "2026-10-01T00:00:00Z" },
+            { stageName: "$default", lastUpdatedDate: "2026-11-02T08:00:00Z" },
+          ],
+        },
+      }),
+    );
+    expect(await apigateway.check("creative-preview", env)).toMatchObject({
+      status: "Up",
+      lastDeploy: "2026-11-02T08:00:00.000Z",
+      deployState: "HTTP API, stage $default",
+      domain: "https://h1.execute-api.us-east-1.amazonaws.com",
+    });
+    expect(calls[0]?.headers.get("authorization")).toMatch(
+      /^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/,
+    );
+    expect(calls[0]?.headers.get("accept")).toBe("application/json");
+  });
+
+  it("finds a REST API by id, with epoch-second stage dates and a stage path in Domain", async () => {
+    mockFetch(
+      routes({
+        "/v2/apis": { items: [] },
+        "/restapis": restApis,
+        "/restapis/r1/stages": { item: [{ stageName: "prod", lastUpdatedDate: 1793606400 }] },
+      }),
+    );
+    expect(await apigateway.check("r1", env)).toMatchObject({
+      status: "Up",
+      lastDeploy: "2026-11-02T08:00:00.000Z",
+      domain: "https://r1.execute-api.us-east-1.amazonaws.com/prod",
+    });
+  });
+
+  it("is Degraded with no stages and Down when the name is unknown", async () => {
+    mockFetch(routes({ "/v2/apis": httpApis, "/restapis": restApis, "/stages": { items: [] } }));
+    expect(await apigateway.check("creative-preview", env)).toMatchObject({
+      status: "Degraded",
+      deployState: "No stages deployed",
+    });
+    expect(await apigateway.check("missing", env)).toEqual({
+      status: "Down",
+      error: "No API named missing in us-east-1.",
+    });
+  });
+});
+
+describe("amplify", () => {
+  const app = (status?: string) => ({
+    apps: [
+      {
+        appId: "d1abc",
+        name: "creative-preview",
+        defaultDomain: "d1abc.amplifyapp.com",
+        productionBranch: status
+          ? { branchName: "main", status, lastDeployTime: 1793606400 }
+          : undefined,
+      },
+    ],
+  });
+
+  it("reads the production branch in one call", async () => {
+    const calls = mockFetch(() => Response.json(app("SUCCEED")));
+    expect(await amplify.check("creative-preview", env)).toMatchObject({
+      status: "Up",
+      lastDeploy: "2026-11-02T08:00:00.000Z",
+      deployState: "main: SUCCEED",
+      domain: "https://main.d1abc.amplifyapp.com",
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe("https://amplify.us-east-1.amazonaws.com/apps?maxResults=100");
+  });
+
+  it("maps failed, running and missing branches", async () => {
+    mockFetch(() => Response.json(app("FAILED")));
+    expect((await amplify.check("d1abc", env)).status).toBe("Down");
+    mockFetch(() => Response.json(app("RUNNING")));
+    expect((await amplify.check("d1abc", env)).status).toBe("Degraded");
+    mockFetch(() => Response.json(app()));
+    expect(await amplify.check("d1abc", env)).toEqual({
+      status: "Degraded",
+      deployState: "No production branch",
+    });
+    expect(await amplify.check("other", env)).toEqual({
+      status: "Down",
+      error: "No Amplify app named other in us-east-1.",
+    });
   });
 });

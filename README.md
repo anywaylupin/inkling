@@ -23,6 +23,8 @@ PARA only touches the properties it owns, and only on rows with Monitor ticked a
 | `neon`            | a project name or id                                 | project found, compute endpoint state; idle computes count as Up      |
 | `lambda`          | a function name or ARN                               | GetFunction state and last update; Inactive counts as Up              |
 | `dynamodb`        | a table name or ARN                                  | DescribeTable status                                                  |
+| `apigateway`      | an HTTP or REST API id or name, or an ARN            | the API's newest stage update; no stages is Degraded                  |
+| `amplify`         | an Amplify Hosting app id or name                    | the production branch's latest build state and domain                 |
 | `mistral`         | anything, such as the project name                   | the API key lists models                                              |
 | `googlegemini`    | anything, such as the project name                   | the API key lists models                                              |
 | `googleanalytics` | a GA4 property id or display name                    | events recorded since yesterday; none is Down                         |
@@ -139,7 +141,7 @@ curl -X POST https://para.<subdomain>.workers.dev/sync \
   It reads up to 300 owned repos and 100 tracked repos.
 - Workers Free allows 50 subrequests per run.
   Each run takes providers in round-robin order until their rows would cost more than 40, counting each row as its provider's calls plus one Notion write.
-  A Google Analytics row costs 5, a GitHub row 4, an http, Cloudflare, Vercel, Render, Neon, Lambda or Cloud Run row 3, every other row 2.
+  A Google Analytics row costs 5, a GitHub or API Gateway row 4, an http, Cloudflare, Vercel, Render, Neon, Lambda or Cloud Run row 3, every other row 2.
   A provider with more rows than the budget still gets a whole run to itself, so keep under about 12 GitHub rows.
 - New cron triggers can take about 15 minutes to start firing after a deploy.
 - Workers Free allows 10 ms of CPU per run; time spent waiting on `fetch` does not count.

@@ -41,7 +41,10 @@ async function awsJson<T>(
     service,
     retries: 0,
   });
-  const res = await aws.fetch(url, init);
+  const res = await aws.fetch(url, {
+    ...init,
+    headers: { accept: "application/json", ...init?.headers },
+  });
   if (!res.ok) {
     await res.body?.cancel();
     throw new ApiError(res.status);
@@ -164,6 +167,135 @@ export const dynamodb: Provider = {
     return {
       status: state === "ACTIVE" ? "Up" : DOWN_TABLE_STATES.includes(state) ? "Down" : "Degraded",
       deployState: state,
+    };
+  },
+};
+
+/** AWS REST APIs answer timestamps as ISO strings or epoch seconds, depending on the service. */
+function awsTime(value: string | number | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  return new Date(typeof value === "number" ? value * 1000 : value).toISOString();
+}
+
+interface HttpApi {
+  apiId: string;
+  name: string;
+  apiEndpoint?: string;
+}
+interface RestApi {
+  id: string;
+  name: string;
+}
+interface Stage {
+  stageName: string;
+  lastUpdatedDate?: string | number;
+}
+
+/**
+ * Finds an HTTP or REST API by id or name, then reads its stages; the newest stage update is the last deploy.
+ *
+ * An API with no stages is Degraded because nothing is deployed; an unknown name is Down.
+ * shortcut: reads the first page of each API list (500 REST, 100 HTTP); page the lists if an account has more.
+ */
+export const apigateway: Provider = {
+  id: "apigateway",
+  cost: 3,
+  link: (resourceId, env) => consoleUrl(resourceId, env, "apigateway/main/apis?region={region}"),
+  async check(resourceId, env) {
+    const missing = missingAws(resourceId, env);
+    if (missing) return missing;
+    const region = regionOf(resourceId, env);
+    const base = `https://apigateway.${region}.amazonaws.com`;
+    const want = nameOf(resourceId);
+    const [httpApis, restApis] = await Promise.all([
+      awsJson<{ items?: HttpApi[] }>(
+        env,
+        "apigateway",
+        resourceId,
+        `${base}/v2/apis?maxResults=100`,
+      ),
+      awsJson<{ item?: RestApi[] }>(env, "apigateway", resourceId, `${base}/restapis?limit=500`),
+    ]);
+    const http = httpApis.items?.find((a) => a.apiId === want || a.name === want);
+    const rest = restApis.item?.find((a) => a.id === want || a.name === want);
+    if (!http && !rest) return { status: "Down", error: `No API named ${want} in ${region}.` };
+
+    const id = http?.apiId ?? rest?.id ?? "";
+    const { items, item } = await awsJson<{ items?: Stage[]; item?: Stage[] }>(
+      env,
+      "apigateway",
+      resourceId,
+      http ? `${base}/v2/apis/${id}/stages` : `${base}/restapis/${id}/stages`,
+    );
+    const stages = (items ?? item ?? [])
+      .map((s) => ({ name: s.stageName, updated: awsTime(s.lastUpdatedDate) }))
+      .sort((a, b) => (b.updated ?? "").localeCompare(a.updated ?? ""));
+    const latest = stages[0];
+    const domain = http?.apiEndpoint ?? `https://${id}.execute-api.${region}.amazonaws.com`;
+    return {
+      status: latest ? "Up" : "Degraded",
+      lastDeploy: latest?.updated,
+      deployState: latest
+        ? `${http ? "HTTP" : "REST"} API, stage ${latest.name}`
+        : "No stages deployed",
+      domain: latest && !http?.apiEndpoint ? `${domain}/${latest.name}` : domain,
+      deployment: consoleUrl(
+        resourceId,
+        env,
+        `apigateway/main/${http ? `develop/routes?api=${id}` : `apis/${id}/resources`}&region={region}`,
+      ),
+    };
+  },
+};
+
+interface AmplifyApp {
+  appId: string;
+  name: string;
+  defaultDomain: string;
+  productionBranch?: { branchName?: string; status?: string; lastDeployTime?: string | number };
+}
+
+/** Production branch build states that mean the live site did not get the last deploy. */
+const DOWN_BUILDS = ["FAILED", "CANCELLED"];
+
+/**
+ * Finds an Amplify Hosting app by id or name and reads its production branch from the app list, in one call.
+ *
+ * SUCCEED is Up, a failed or cancelled build is Down, anything else (running, pending) is Degraded.
+ * shortcut: reads the first 100 apps; page the list if an account has more.
+ */
+export const amplify: Provider = {
+  id: "amplify",
+  cost: 1,
+  link: (resourceId, env) => consoleUrl(resourceId, env, "amplify/apps?region={region}"),
+  async check(resourceId, env) {
+    const missing = missingAws(resourceId, env);
+    if (missing) return missing;
+    const region = regionOf(resourceId, env);
+    const want = nameOf(resourceId);
+    const { apps } = await awsJson<{ apps: AmplifyApp[] }>(
+      env,
+      "amplify",
+      resourceId,
+      `https://amplify.${region}.amazonaws.com/apps?maxResults=100`,
+    );
+    const app = apps.find((a) => a.appId === want || a.name === want);
+    if (!app) return { status: "Down", error: `No Amplify app named ${want} in ${region}.` };
+    const branch = app.productionBranch;
+    if (!branch?.branchName) {
+      return { status: "Degraded", deployState: "No production branch" };
+    }
+    const build = branch.status ?? "UNKNOWN";
+    return {
+      status: build === "SUCCEED" ? "Up" : DOWN_BUILDS.includes(build) ? "Down" : "Degraded",
+      lastDeploy: awsTime(branch.lastDeployTime),
+      deployState: `${branch.branchName}: ${build}`,
+      domain: `https://${branch.branchName}.${app.defaultDomain}`,
+      deployment: consoleUrl(
+        resourceId,
+        env,
+        `amplify/apps/${app.appId}/branches/${encodeURIComponent(branch.branchName)}/deployments?region={region}`,
+      ),
     };
   },
 };
