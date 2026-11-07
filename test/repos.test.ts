@@ -189,13 +189,30 @@ describe("syncRepos", () => {
     expect(body?.variables).toEqual({ ro0: "acme", rn0: "old" });
   });
 
-  it("skips unchanged repos on the next run", async () => {
+  it("skips unchanged repos on the next run, but restores a missing icon", async () => {
     fakeApis();
     await syncRepos(env);
-    const calls = fakeApis();
+    // The fake row has no icon yet, so the second run writes it even though nothing else changed.
+    const again = fakeApis();
     await syncRepos(env);
-    const patched = (await writes(calls)).filter((w) => w.path.endsWith("page-site"));
-    expect(patched).toHaveLength(0);
+    const restored = (await writes(again)).find((w) => w.path.endsWith("page-site"));
+    expect(restored?.body["icon"]).toMatchObject({ type: "external" });
+
+    const [saved] = ROWS["repos-ds"];
+    if (!saved) throw new Error("fixture missing");
+    ROWS["repos-ds"][0] = {
+      ...saved,
+      icon: restored?.body["icon"],
+      cover: restored?.body["cover"],
+    } as typeof saved;
+    try {
+      const calls = fakeApis();
+      await syncRepos(env);
+      const patched = (await writes(calls)).filter((w) => w.path.endsWith("page-site"));
+      expect(patched).toHaveLength(0);
+    } finally {
+      ROWS["repos-ds"][0] = saved;
+    }
   });
 
   it("writes nothing when GitHub answers with an error", async () => {

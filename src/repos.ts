@@ -266,6 +266,11 @@ export function repoCover(repo: Repo): { type: "external"; external: { url: stri
   return repo.isPrivate ? null : { type: "external", external: { url: repo.openGraphImageUrl } };
 }
 
+/** The external URL of an icon or cover, or null when it is missing or not an external image. */
+function urlOf(file: PageObjectResponse["icon"] | PageObjectResponse["cover"] | undefined) {
+  return file?.type === "external" ? file.external.url : null;
+}
+
 /** True when the row has no icon or cover, or one PARA set, so sync may replace it. */
 function ownedBySync(
   file: PageObjectResponse["icon"] | PageObjectResponse["cover"],
@@ -321,8 +326,11 @@ export async function syncRepos(env: Env, now = new Date()): Promise<void> {
     const icon =
       !page || ownedBySync(page.icon, [FAVICON, AVATAR, RAW]) ? repoIcon(repo) : undefined;
     const cover = !page || ownedBySync(page.cover, COVERS) ? repoCover(repo) : undefined;
-    const props = JSON.stringify([properties, icon?.external.url, cover?.external.url]);
-    if (page && snapshot[key] === props) continue;
+    const props = JSON.stringify(properties);
+    // Checked against the page itself, so a missing or removed icon is restored even when nothing else changed.
+    const iconStale = icon !== undefined && urlOf(page?.icon) !== icon.external.url;
+    const coverStale = cover !== undefined && urlOf(page?.cover) !== (cover?.external.url ?? null);
+    if (page && snapshot[key] === props && !iconStale && !coverStale) continue;
     const synced = { "Last synced": { date: { start: nowIso } } };
     repoWrites.push({
       key,
