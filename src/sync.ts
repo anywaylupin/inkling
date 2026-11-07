@@ -1,6 +1,7 @@
 import type { Env } from "./env";
 import { notionClient, retrievePage, sameId, toRow } from "./notion";
 import { syncRepos } from "./repos";
+import { syncSkills } from "./skills";
 import { syncRow } from "./run";
 
 /** Compares in constant time so response timing never leaks how much of the key matched. */
@@ -49,6 +50,10 @@ export async function handleSync(
   if (sameId(source, env.REPOS_DATA_SOURCE_ID)) {
     ctx.waitUntil(syncRepos(env));
     return Response.json({ syncing: pageId, source: "repos" }, { status: 200 });
+  }
+  if (sameId(source, env.SKILLS_DATA_SOURCE_ID)) {
+    ctx.waitUntil(syncSkills(env));
+    return Response.json({ syncing: pageId, source: "skills" }, { status: 200 });
   }
   const row = found && sameId(source, env.INFRA_DATA_SOURCE_ID) ? toRow(found.page) : undefined;
   if (!row) return Response.json({ error: "No syncable row with that id" }, { status: 404 });

@@ -9,6 +9,8 @@ export interface Env {
   INFRA_DATA_SOURCE_ID: string;
   /** Turns on the GitHub repo sync; without it the repo cron does nothing. */
   REPOS_DATA_SOURCE_ID?: string;
+  /** Turns on the agent skill sync; without it the skills cron does nothing. */
+  SKILLS_DATA_SOURCE_ID?: string;
   GITHUB_TOKEN?: string;
   CF_API_TOKEN?: string;
   CF_ACCOUNT_ID?: string;

@@ -55,7 +55,7 @@ Create Status by hand with the four options above.
 
 1. Create a Notion internal connection with read and update content, and share your services database with it, plus any database its Provider or Resource ID formulas read through relations.
 2. Clone this repo and run `pnpm install`.
-3. Copy `.dev.vars.example` to `.dev.vars` and fill in `NOTION_TOKEN`, `INFRA_DATA_SOURCE_ID`, optionally `REPOS_DATA_SOURCE_ID`, and the provider tokens you use. See [SECURITY.md](SECURITY.md) for scopes.
+3. Copy `.dev.vars.example` to `.dev.vars` and fill in `NOTION_TOKEN`, `INFRA_DATA_SOURCE_ID`, optionally `REPOS_DATA_SOURCE_ID` and `SKILLS_DATA_SOURCE_ID`, and the provider tokens you use. See [SECURITY.md](SECURITY.md) for scopes.
 4. Run `pnpm setup:notion` to add the PARA-owned properties to the data source.
 5. Log in to Cloudflare with `pnpm wrangler login`.
 6. Run `pnpm wrangler kv namespace create PARA_STATE` and put its id in `wrangler.jsonc` when you fork this repo.
@@ -85,15 +85,31 @@ Repos rows are keyed by Key, written as `owner/repo`:
 
 The repo sync needs these columns on Repos: Key and Description (text), GitHub and Domain (url), Topics (multi-select), Language and Visibility (select), Stars, Fork count, Open PRs and Open issues (number), Default branch, Commit message and Latest release (text), Last commit, Released and Last synced (date), Status (status, with Discovered and Deprecated options), Origin (select) and Forked from (relation to Repos).
 
+## Agent skill sync
+
+Set `SKILLS_DATA_SOURCE_ID` to turn it on.
+It runs at minutes 22 and 52 of every hour and uses the same `GITHUB_TOKEN`.
+
+Only Skills rows with Type `Skill` and a GitHub Source are synced:
+
+- Source is `owner/repo`, or a GitHub URL to the repo or to the skill's folder, such as `https://github.com/owner/repo/tree/main/skills/pdf`.
+- With `owner/repo`, sync looks for `SKILL.md` in `skills/<Skill name>/`, `<Skill name>/` and `.claude/skills/<Skill name>/`, or at the repo root when Skill name is empty.
+- Sync writes Purpose from the `description` in the `SKILL.md` frontmatter, Website as the skill folder's GitHub link, and Skill name from `name` when it is empty.
+- A page without an icon gets the repo owner's avatar.
+- A row is written only when one of those values differs, and rows whose skill is not found are left alone.
+
+Skills also has an Install formula column that builds the `npx skills add` command for the row's Source, Skill name and Install scope (Claude global, Claude project or All agents), ready to copy into a terminal.
+The columns are Source, Skill name and Purpose (text), Website (url), Install scope (select) and Type (select, with a Skill option).
+
 ## Sync a row now
 
 `POST /sync` syncs one row right away instead of waiting for its cron turn.
-An Infra row is checked on its own; a Repos row runs the whole repo sync, which costs about the same.
+An Infra row is checked on its own; a Repos or Skills row runs the whole repo or skills sync, which costs about the same.
 It stays off until you set the `SYNC_SECRET` Worker secret to a long random string.
 
 Every request needs the header `x-para-key: <SYNC_SECRET>` and a JSON body that is either a Notion button webhook or `{ "page_id": "<page id>" }`.
 It answers 200 at once, because Notion buttons treat any other status as a failure, and updates the row a few seconds later.
-It refuses pages outside your Infra and Repos data sources, and Infra rows without Monitor ticked.
+It refuses pages outside your Infra, Repos and Skills data sources, and Infra rows without Monitor ticked.
 
 To add a sync button in Notion:
 

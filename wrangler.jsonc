@@ -3,7 +3,7 @@
   "name": "para",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-28",
-  "triggers": { "crons": ["*/15 * * * *", "7,37 * * * *"] },
+  "triggers": { "crons": ["*/15 * * * *", "7,37 * * * *", "22,52 * * * *"] },
   "kv_namespaces": [{ "binding": "PARA_STATE", "id": "ca726b93a5aa4b1e857b22e5c793f9a8" }],
   "observability": { "enabled": true },
 }

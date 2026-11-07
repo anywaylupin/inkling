@@ -1,10 +1,13 @@
 import type { Env } from "./env";
 import { syncRepos } from "./repos";
 import { run } from "./run";
+import { syncSkills } from "./skills";
 import { handleSync } from "./sync";
 
 /** Must match the second cron in wrangler.jsonc; offset from the Infra cron so the two never share Notion's rate limit. */
-export const REPOS_CRON = "7,37 * * * *";
+const REPOS_CRON = "7,37 * * * *";
+/** Must match the third cron in wrangler.jsonc; its own slot, so it never shares the repo sync's subrequest budget. */
+const SKILLS_CRON = "22,52 * * * *";
 
 export default {
   async fetch(request, env, ctx) {
@@ -18,6 +21,7 @@ export default {
 
   async scheduled(controller, env) {
     if (controller.cron === REPOS_CRON) await syncRepos(env);
+    else if (controller.cron === SKILLS_CRON) await syncSkills(env);
     else await run(env);
   },
 } satisfies ExportedHandler<Env>;

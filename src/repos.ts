@@ -98,7 +98,7 @@ export interface Repo {
 }
 
 /** Posts one GraphQL query; a null alias with a NOT_FOUND error means that repo is gone. */
-async function graphql<T>(
+export async function graphql<T>(
   token: string,
   query: string,
   variables: Record<string, unknown>,
@@ -172,7 +172,10 @@ async function lookup(token: string, keys: string[]): Promise<Map<string, Repo |
 }
 
 /** Reads every row of a data source, across all result pages. */
-async function queryAll(notion: Client, dataSourceId: string): Promise<PageObjectResponse[]> {
+export async function queryAll(
+  notion: Client,
+  dataSourceId: string,
+): Promise<PageObjectResponse[]> {
   const pages: PageObjectResponse[] = [];
   let cursor: string | undefined;
   do {
@@ -192,7 +195,7 @@ function statusOf(page: PageObjectResponse): string {
 }
 
 /** Rich text capped at Notion's 2000 characters, optionally linked. */
-function richText(content: string, url?: string | null) {
+export function richText(content: string, url?: string | null) {
   return {
     rich_text: [{ text: { content: content.slice(0, 2000), ...(url && { link: { url } }) } }],
   };
@@ -454,6 +457,6 @@ export async function syncRepos(env: Env, now = new Date()): Promise<void> {
 }
 
 /** Logs the error class only, never a response body. */
-function logFailure(error: unknown): void {
+export function logFailure(error: unknown): void {
   console.error(`notion write failed: ${error instanceof Error ? error.name : "Error"}`);
 }
