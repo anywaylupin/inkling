@@ -85,21 +85,27 @@ Repos rows are keyed by Key, written as `owner/repo`:
 
 The repo sync needs these columns on Repos: Key and Description (text), GitHub and Domain (url), Topics (multi-select), Language and Visibility (select), Stars, Fork count, Open PRs and Open issues (number), Default branch, Commit message and Latest release (text), Last commit, Released and Last synced (date), Status (status, with Discovered and Deprecated options), Origin (select) and Forked from (relation to Repos).
 
-## Agent skill sync
+## AI skill and plugin sync
 
-Set `SKILLS_DATA_SOURCE_ID` to turn it on.
+The Skills data source tracks the AI tooling you use or watch: agent skills, Claude Code marketplace plugins, MCP servers and subagents.
+Set `SKILLS_DATA_SOURCE_ID` to turn the sync on.
 It runs at minutes 22 and 52 of every hour and uses the same `GITHUB_TOKEN`.
 
-Only Skills rows with Type `Skill` and a GitHub Source are synced:
+Rows with Kind `Skill` or `Plugin` and a GitHub Source are synced:
 
-- Source is `owner/repo`, or a GitHub URL to the repo or to the skill's folder, such as `https://github.com/owner/repo/tree/main/skills/pdf`.
-- With `owner/repo`, sync looks for `SKILL.md` in `skills/<Skill name>/`, `<Skill name>/` and `.claude/skills/<Skill name>/`, or at the repo root when Skill name is empty.
-- Sync writes Purpose from the `description` in the `SKILL.md` frontmatter, Website as the skill folder's GitHub link, and Skill name from `name` when it is empty.
+- Source is `owner/repo`, or a GitHub URL to the repo or to one folder, such as `https://github.com/owner/repo/tree/main/skills/pdf`.
+- A Skill is read from `SKILL.md`, looked up in `skills/<Slug>/`, `<Slug>/` and `.claude/skills/<Slug>/`, or at the repo root when Slug is empty.
+- A Plugin is read from `.claude-plugin/plugin.json`, looked up in `plugins/<Slug>/`, `<Slug>/` and the repo root. Its marketplace name comes from the repo's `.claude-plugin/marketplace.json`.
+- Sync writes Description and Version from the manifest, GitHub as the folder link and Stars from the repo. It fills Slug and Marketplace only when they are empty.
 - A page without an icon gets the repo owner's avatar.
-- A row is written only when one of those values differs, and rows whose skill is not found are left alone.
+- A row is written only when one of those values differs. Rows whose manifest is not found, and other Kinds, are left alone.
 
-Skills also has an Install formula column that builds the `npx skills add` command for the row's Source, Skill name and Install scope (Claude global, Claude project or All agents), ready to copy into a terminal.
-The columns are Source, Skill name and Purpose (text), Website (url), Install scope (select) and Type (select, with a Skill option).
+The Install formula builds the command to copy:
+
+- Skill: `npx skills add <Source> --skill <Slug>`, with `-g -a claude-code` for Claude global (the default), `-a claude-code` for Claude project, or `-g` for All agents.
+- Plugin: `/plugin marketplace add <Source>` then `/plugin install <Slug>@<Marketplace>`, to paste into Claude Code.
+
+The columns are Kind (select: Skill, Plugin, MCP server, Agent), Source, Slug, Marketplace, Version and Description (text), GitHub (url), Stars (number), Install scope (select) and Install (formula).
 
 ## Sync a row now
 

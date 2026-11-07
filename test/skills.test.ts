@@ -1,18 +1,19 @@
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
 import type { PageObjectResponse } from "@notionhq/client";
 import { describe, expect, it } from "vitest";
-import { frontmatter, syncSkills, targetOf } from "../src/skills";
+import { frontmatter, pluginManifest, syncSkills, targetOf } from "../src/skills";
 import { handleSync } from "../src/sync";
 import { mockFetch, testEnv } from "./helpers";
 
 const env = { ...testEnv, SKILLS_DATA_SOURCE_ID: "skills-ds", SYNC_SECRET: "test-sync-secret" };
 
+const rt = (value?: string) => ({
+  type: "rich_text",
+  rich_text: value ? [{ plain_text: value }] : [],
+});
+
 /** A Skills row as dataSources.query returns it. */
-function row(id: string, fields: { source: string; name?: string; type?: string; icon?: unknown }) {
-  const rt = (value?: string) => ({
-    type: "rich_text",
-    rich_text: value ? [{ plain_text: value }] : [],
-  });
+function row(id: string, fields: { source: string; slug?: string; kind?: string; icon?: unknown }) {
   return {
     object: "page",
     id,
@@ -21,11 +22,14 @@ function row(id: string, fields: { source: string; name?: string; type?: string;
     icon: fields.icon ?? null,
     parent: { type: "data_source_id", data_source_id: "skills-ds", database_id: "db-1" },
     properties: {
-      Type: { type: "select", select: { name: fields.type ?? "Skill" } },
+      Kind: { type: "select", select: { name: fields.kind ?? "Skill" } },
       Source: rt(fields.source),
-      "Skill name": rt(fields.name),
-      Purpose: rt(),
-      Website: { type: "url", url: null },
+      Slug: rt(fields.slug),
+      Description: rt(),
+      Version: rt(),
+      Marketplace: rt(),
+      GitHub: { type: "url", url: null as string | null },
+      Stars: { type: "number", number: null as number | null },
     },
   };
 }
@@ -36,23 +40,37 @@ description: "Build distinctive interfaces"
 ---
 # Frontend design`;
 
-/** Fakes Notion and GitHub; `rows` are the Skills rows. */
+const PLUGIN_JSON = JSON.stringify({
+  name: "ponytail",
+  version: "5.3.3",
+  description: "Lazy senior dev mode.",
+});
+const MARKETPLACE_JSON = JSON.stringify({ name: "ponytail-market", plugins: [] });
+
+/** Fakes Notion and GitHub: s0 is a skill found in its second folder, s1 is gone, s2 is a plugin at the repo root. */
 function fakeApis(rows: unknown[]) {
   return mockFetch(async (url, request) => {
     if (url.hostname === "api.github.com") {
-      const { variables } = await request.json<{ variables: Record<string, string> }>();
-      // s0 finds SKILL.md in its second candidate folder; s1's repo is gone.
       return Response.json({
         data: {
           s0: {
             url: "https://github.com/acme/agent-skills",
+            stargazerCount: 12,
             owner: { avatarUrl: "https://avatars.githubusercontent.com/u/9" },
             defaultBranchRef: { name: "main" },
             f0: null,
-            f1: variables["e0_1"] ? { text: SKILL_MD } : null,
+            f1: { text: SKILL_MD },
             f2: null,
           },
           s1: null,
+          s2: {
+            url: "https://github.com/acme/ponytail",
+            stargazerCount: 7,
+            owner: { avatarUrl: "https://avatars.githubusercontent.com/u/9" },
+            defaultBranchRef: { name: "main" },
+            f0: { text: PLUGIN_JSON },
+            m: { text: MARKETPLACE_JSON },
+          },
         },
         errors: [{ type: "NOT_FOUND" }],
       });
@@ -75,15 +93,24 @@ async function patches(calls: Request[]) {
 }
 
 describe("targetOf", () => {
-  const page = (source: string, name?: string) =>
-    row("p", { source, name }) as unknown as PageObjectResponse;
+  const page = (source: string, slug?: string, kind?: string) =>
+    row("p", { source, slug, kind }) as unknown as PageObjectResponse;
 
-  it("reads owner/repo with a skill name as candidate folders", () => {
+  it("reads owner/repo with a slug as candidate folders for a skill", () => {
     expect(targetOf(page("acme/agent-skills", "frontend-design"))).toMatchObject({
+      kind: "Skill",
       owner: "acme",
       repo: "agent-skills",
       folders: ["skills/frontend-design", "frontend-design", ".claude/skills/frontend-design"],
     });
+  });
+
+  it("looks in plugins/<slug>, <slug> and the root for a plugin", () => {
+    expect(targetOf(page("acme/tools", "lint", "Plugin"))?.folders).toEqual([
+      "plugins/lint",
+      "lint",
+      "",
+    ]);
   });
 
   it("reads a folder URL as that exact folder and branch", () => {
@@ -97,52 +124,73 @@ describe("targetOf", () => {
     });
   });
 
-  it("looks at the repo root without a skill name, and ignores non-GitHub sources", () => {
-    expect(targetOf(page("acme/one-skill"))?.folders).toEqual([""]);
+  it("ignores other kinds and non-GitHub sources", () => {
+    expect(targetOf(page("acme/x", undefined, "MCP server"))).toBeUndefined();
     expect(targetOf(page("https://gitlab.com/acme/x"))).toBeUndefined();
   });
 });
 
-describe("frontmatter", () => {
-  it("reads name and description, unquoted", () => {
+describe("manifests", () => {
+  it("reads SKILL.md frontmatter, unquoted", () => {
     expect(frontmatter(SKILL_MD)).toEqual({
       name: "frontend-design",
       description: "Build distinctive interfaces",
+      version: undefined,
     });
   });
 
   it("joins a folded (>) description and keeps a literal (|) one's lines", () => {
     const folded =
       "---\nname: ponytail\ndescription: >\n  Lazy senior dev mode:\n  the smallest change.\nlicense: MIT\n---\n";
-    expect(frontmatter(folded)).toEqual({
+    expect(frontmatter(folded)).toMatchObject({
       name: "ponytail",
       description: "Lazy senior dev mode: the smallest change.",
     });
     const literal = "---\ndescription: |-\n  line one\n  line two\n---\n";
     expect(frontmatter(literal).description).toBe("line one\nline two");
   });
+
+  it("reads plugin.json, and treats a broken one as empty", () => {
+    expect(pluginManifest(PLUGIN_JSON)).toEqual({
+      name: "ponytail",
+      description: "Lazy senior dev mode.",
+      version: "5.3.3",
+    });
+    expect(pluginManifest("{oops")).toEqual({});
+  });
 });
 
 describe("syncSkills", () => {
-  it("fills Purpose, Website, Skill name and a missing icon from SKILL.md", async () => {
+  it("fills skill and plugin rows from their manifests and repos", async () => {
     const calls = fakeApis([
-      row("skill-1", { source: "acme/agent-skills", name: "frontend-design" }),
+      row("skill-1", { source: "acme/agent-skills", slug: "frontend-design" }),
       row("skill-2", { source: "acme/gone" }),
-      row("tech-1", { source: "acme/agent-skills", type: "Framework" }),
+      row("plugin-1", { source: "acme/ponytail", kind: "Plugin" }),
+      row("mcp-1", { source: "acme/agent-skills", kind: "MCP server" }),
     ]);
     await syncSkills(env);
     const written = await patches(calls);
-    expect(written).toHaveLength(1);
-    expect(written[0]?.path).toBe("/v1/pages/skill-1");
+    expect(written.map((w) => w.path)).toEqual(["/v1/pages/skill-1", "/v1/pages/plugin-1"]);
+
     expect(written[0]?.body).toMatchObject({
       icon: { type: "external", external: { url: "https://avatars.githubusercontent.com/u/9" } },
       properties: {
-        Purpose: { rich_text: [{ text: { content: "Build distinctive interfaces" } }] },
-        Website: { url: "https://github.com/acme/agent-skills/tree/main/frontend-design" },
+        Description: { rich_text: [{ text: { content: "Build distinctive interfaces" } }] },
+        GitHub: { url: "https://github.com/acme/agent-skills/tree/main/frontend-design" },
+        Stars: { number: 12 },
       },
     });
-    // Skill name was already set, so it is left alone.
-    expect(written[0]?.body["properties"]).not.toHaveProperty("Skill name");
+    // Slug was already set, so it is left alone.
+    expect(written[0]?.body["properties"]).not.toHaveProperty("Slug");
+
+    expect(written[1]?.body["properties"]).toMatchObject({
+      Description: { rich_text: [{ text: { content: "Lazy senior dev mode." } }] },
+      Version: { rich_text: [{ text: { content: "5.3.3" } }] },
+      Slug: { rich_text: [{ text: { content: "ponytail" } }] },
+      Marketplace: { rich_text: [{ text: { content: "ponytail-market" } }] },
+      GitHub: { url: "https://github.com/acme/ponytail" },
+      Stars: { number: 7 },
+    });
 
     const query = calls.find((c) => c.url.includes("graphql"));
     const body = await query?.json<{ query: string; variables: Record<string, string> }>();
@@ -151,21 +199,21 @@ describe("syncSkills", () => {
       o0: "acme",
       n0: "agent-skills",
       e0_0: "HEAD:skills/frontend-design/SKILL.md",
+      e2_0: "HEAD:.claude-plugin/plugin.json",
+      m2: "HEAD:.claude-plugin/marketplace.json",
     });
   });
 
   it("writes nothing when every value already matches and the page has an icon", async () => {
     const current = row("skill-1", {
       source: "acme/agent-skills",
-      name: "frontend-design",
+      slug: "frontend-design",
       icon: { type: "emoji", emoji: "🎨" },
     });
-    current.properties.Purpose = {
-      type: "rich_text",
-      rich_text: [{ plain_text: "Build distinctive interfaces" }],
-    };
-    (current.properties.Website as { url: string | null }).url =
+    current.properties.Description = rt("Build distinctive interfaces");
+    current.properties.GitHub.url =
       "https://github.com/acme/agent-skills/tree/main/frontend-design";
+    current.properties.Stars.number = 12;
     const calls = fakeApis([current]);
     await syncSkills(env);
     expect(await patches(calls)).toHaveLength(0);
