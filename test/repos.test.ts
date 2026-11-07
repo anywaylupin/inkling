@@ -72,6 +72,9 @@ const ROWS = {
 /** Fakes GitHub GraphQL and Notion; `graphqlErrors` makes the first GitHub call fail like a rate limit. */
 function fakeApis(graphqlErrors = false) {
   return mockFetch(async (url, request) => {
+    if (url.hostname === "api.github.com" && url.pathname.startsWith("/repos/")) {
+      return new Response(new Blob(["png"], { type: "image/png" }));
+    }
     if (url.hostname === "api.github.com") {
       const { query } = await request.json<{ query: string }>();
       if (graphqlErrors) return Response.json({ errors: [{ type: "RATE_LIMITED" }] });
@@ -147,10 +150,18 @@ describe("syncRepos", () => {
     });
     expect(update("page-old")).toEqual({ Status: { status: { name: "Deprecated" } } });
 
-    // Private repo: owner avatar even with an icon file. Public repo: its app/favicon.ico.
+    // Private repo: its icon file, downloaded with the token and uploaded to Notion. Public repo: a raw link.
     expect(created[0]?.body["icon"]).toEqual({
-      type: "external",
-      external: { url: "https://avatars.githubusercontent.com/u/1?v=4" },
+      type: "file_upload",
+      file_upload: { id: "created" },
+    });
+    const download = calls.find((c) => c.url.includes("/repos/acme/new/contents/"));
+    expect(download?.url).toBe("https://api.github.com/repos/acme/new/contents/app/apple-icon.png");
+    expect(calls.some((c) => c.url.endsWith("/v1/file_uploads/created/send"))).toBe(true);
+    const create = calls.find((c) => c.url.endsWith("/v1/file_uploads"));
+    expect(await create?.json()).toMatchObject({
+      filename: "apple-icon.png",
+      content_type: "image/png",
     });
     const sitePatch = all.find((w) => w.method === "PATCH" && w.path.endsWith("page-site"));
     expect(sitePatch?.body["icon"]).toEqual({

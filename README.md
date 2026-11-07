@@ -77,7 +77,7 @@ Repos rows are keyed by Key, written as `owner/repo`:
 - Rows whose Key names a repo you do not own are updated too, so you can track open-source projects.
 - A repo that disappears, or that GitHub archives, gets Status Deprecated. Rows are never deleted.
 - Sync writes Description, GitHub, Domain, Topics, Language, Visibility, Stars, Fork count, Open PRs, Open issues, Default branch, Last commit, Commit message, Latest release, Released, Forked from and Last synced. Name, Origin, Status and your relations stay yours after the row exists.
-- The page icon is the first framework icon file found in a public repo, such as `app/apple-icon.png`, `public/logo.svg` or `app/favicon.ico`, linked from raw.githubusercontent.com. Private repos and repos without one get the owner's GitHub avatar.
+- The page icon is the first framework icon file found in the repo, such as `app/apple-icon.png`, `public/logo.svg` or `app/favicon.ico`. Public repos link it from raw.githubusercontent.com; private repos have it downloaded with `GITHUB_TOKEN` and uploaded to Notion once. Repos without one get the owner's GitHub avatar.
   The cover is the repo's social preview, the one uploaded in repo settings or GitHub's generated card, for public repos only.
   An icon or cover you set yourself is never replaced.
 - Only the latest commit on the default branch is kept.

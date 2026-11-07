@@ -242,13 +242,59 @@ const RAW = "https://raw.githubusercontent.com/";
  * Private repos always get the avatar, because raw file links need a GitHub session for them.
  */
 export function repoIcon(repo: Repo): { type: "external"; external: { url: string } } {
-  const path = ICON_PATHS.find((_, i) => repo[`i${i}`]);
+  const path = iconPath(repo);
   const branch = repo.defaultBranchRef?.name;
   const url =
     !repo.isPrivate && path && branch
       ? `${RAW}${repo.nameWithOwner}/${encodeURIComponent(branch)}/${path}`
       : repo.owner.avatarUrl;
   return { type: "external", external: { url } };
+}
+
+const ICON_TYPES: Record<string, string> = {
+  png: "image/png",
+  svg: "image/svg+xml",
+  ico: "image/vnd.microsoft.icon",
+};
+
+function iconPath(repo: Repo): string | undefined {
+  return ICON_PATHS.find((_, i) => repo[`i${i}`]);
+}
+
+/**
+ * Copies a private repo's icon file into Notion, since raw links to private repos need a GitHub session.
+ *
+ * Costs 3 subrequests: the GitHub download, then Notion's create and send.
+ * shortcut: once uploaded, Notion holds its own copy, so a later change to the repo's icon is not picked up; clear the page icon to upload again.
+ */
+async function uploadIcon(
+  notion: Client,
+  token: string,
+  repo: Repo,
+  path: string,
+): Promise<{ type: "file_upload"; file_upload: { id: string } }> {
+  const res = await fetch(`https://api.github.com/repos/${repo.nameWithOwner}/contents/${path}`, {
+    headers: {
+      authorization: `Bearer ${token}`,
+      accept: "application/vnd.github.raw",
+      "user-agent": "para",
+    },
+  });
+  if (!res.ok) {
+    await res.body?.cancel();
+    throw new ApiError(res.status);
+  }
+  const filename = path.split("/").pop() ?? "icon";
+  // GitHub labels raw downloads application/vnd.github.raw, so the type comes from the extension.
+  const type = ICON_TYPES[filename.split(".").pop() ?? ""] ?? "image/png";
+  const data = new Blob([await res.arrayBuffer()], { type });
+  const upload = await notion.fileUploads.create({
+    mode: "single_part",
+    filename,
+    content_type: type,
+  });
+  await notion.fileUploads.send({ file_upload_id: upload.id, file: { filename, data } });
+  return { type: "file_upload", file_upload: { id: upload.id } };
 }
 
 /** GitHub's generated repo card, and the host of social previews uploaded in repo settings. */
@@ -316,7 +362,8 @@ export async function syncRepos(env: Env, now = new Date()): Promise<void> {
   const nextSnapshot = { ...snapshot };
   const nowIso = now.toISOString();
 
-  const repoWrites: { key: string; props: string; write: Write }[] = [];
+  /** cost is the subrequests a write spends: 1 for a Notion write, 4 when it also uploads an icon. */
+  const repoWrites: { key: string; props: string; cost?: number; write: Write }[] = [];
   const allRepos = [...owned, ...[...found.values()].filter((r): r is Repo => r !== null)];
   for (const repo of allRepos) {
     const key = repo.nameWithOwner.toLowerCase();
@@ -328,25 +375,38 @@ export async function syncRepos(env: Env, now = new Date()): Promise<void> {
     const cover = !page || ownedBySync(page.cover, COVERS) ? repoCover(repo) : undefined;
     const props = JSON.stringify(properties);
     // Checked against the page itself, so a missing or removed icon is restored even when nothing else changed.
-    const iconStale = icon !== undefined && urlOf(page?.icon) !== icon.external.url;
+    // A private repo's icon file is uploaded; the page then holds a Notion file, which sync treats as yours.
+    const privatePath = icon && repo.isPrivate ? iconPath(repo) : undefined;
+    const iconStale =
+      icon !== undefined && (privatePath !== undefined || urlOf(page?.icon) !== icon.external.url);
     const coverStale = cover !== undefined && urlOf(page?.cover) !== (cover?.external.url ?? null);
     if (page && snapshot[key] === props && !iconStale && !coverStale) continue;
     const synced = { "Last synced": { date: { start: nowIso } } };
+    const token = env.GITHUB_TOKEN;
+    // An upload that fails falls back to the avatar, so the row is still written.
+    const finalIcon = async () =>
+      privatePath
+        ? await uploadIcon(notion, token, repo, privatePath).catch((error: unknown) => {
+            logFailure(error);
+            return icon;
+          })
+        : icon;
     repoWrites.push({
       key,
       props,
+      cost: privatePath ? 4 : 1,
       write: page
-        ? () =>
+        ? async () =>
             notion.pages.update({
               page_id: page.id,
-              ...(icon && { icon }),
+              ...(icon && { icon: await finalIcon() }),
               ...(cover !== undefined && { cover }),
               properties: { ...properties, ...synced },
             })
-        : () =>
+        : async () =>
             notion.pages.create({
               parent: { data_source_id: reposSource },
-              icon,
+              icon: await finalIcon(),
               cover,
               properties: {
                 Name: { title: [{ text: { content: repo.name } }] },
@@ -379,8 +439,9 @@ export async function syncRepos(env: Env, now = new Date()): Promise<void> {
 
   const write = throttle(334);
   let budget = WRITE_BUDGET;
-  for (const { key, props, write: run } of repoWrites) {
-    if (budget-- <= 0) break;
+  for (const { key, props, cost = 1, write: run } of repoWrites) {
+    if (budget < cost) continue;
+    budget -= cost;
     const ok = await write(run).then(
       () => true,
       (error: unknown) => (logFailure(error), false),
