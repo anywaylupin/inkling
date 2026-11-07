@@ -1,15 +1,10 @@
-import {
-  isFullPage,
-  type Client,
-  type PageObjectResponse,
-  type UpdatePageParameters,
-} from "@notionhq/client";
+import { type Client, type PageObjectResponse, type UpdatePageParameters } from "@notionhq/client";
 import type { Env } from "./env";
-import { notionClient, text } from "./notion";
+import { graphql } from "./github";
+import { logFailure, notionClient, queryAll, richText, text } from "./notion";
 import { ApiError } from "./providers/types";
 import { throttle } from "./throttle";
 
-const GRAPHQL = "https://api.github.com/graphql";
 const REPO_KEY = /^[\w.-]+\/[\w.-]+$/;
 
 /**
@@ -97,32 +92,6 @@ export interface Repo {
   [icon: `i${number}`]: { id: string } | null | undefined;
 }
 
-/** Posts one GraphQL query; a null alias with a NOT_FOUND error means that repo is gone. */
-export async function graphql<T>(
-  token: string,
-  query: string,
-  variables: Record<string, unknown>,
-): Promise<T> {
-  const res = await fetch(GRAPHQL, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-      "user-agent": "para",
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  if (!res.ok) {
-    await res.body?.cancel();
-    throw new ApiError(res.status);
-  }
-  const body = await res.json<{ data?: T; errors?: { type?: string }[] }>();
-  // Any error other than NOT_FOUND aborts the run, so a rate limit never reads as "every repo was deleted".
-  const fatal = (body.errors ?? []).find((e) => e.type !== "NOT_FOUND");
-  if (!body.data || fatal) throw new Error(`GitHub GraphQL ${fatal?.type ?? "returned no data"}`);
-  return body.data;
-}
-
 /** Lists every repo the token's user owns, private ones included, up to 300. */
 async function ownedRepos(token: string): Promise<{ login: string; repos: Repo[] }> {
   const query = `query($after: String) { viewer { login repositories(first: 100, after: $after, ownerAffiliations: [OWNER]) {
@@ -171,34 +140,9 @@ async function lookup(token: string, keys: string[]): Promise<Map<string, Repo |
   return new Map(keys.map((key, i) => [key, data[`r${i}`] ?? null]));
 }
 
-/** Reads every row of a data source, across all result pages. */
-export async function queryAll(
-  notion: Client,
-  dataSourceId: string,
-): Promise<PageObjectResponse[]> {
-  const pages: PageObjectResponse[] = [];
-  let cursor: string | undefined;
-  do {
-    const res = await notion.dataSources.query({
-      data_source_id: dataSourceId,
-      start_cursor: cursor,
-    });
-    pages.push(...res.results.filter(isFullPage));
-    cursor = res.next_cursor ?? undefined;
-  } while (cursor);
-  return pages;
-}
-
 function statusOf(page: PageObjectResponse): string {
   const prop = page.properties["Status"];
   return prop?.type === "status" ? (prop.status?.name ?? "") : "";
-}
-
-/** Rich text capped at Notion's 2000 characters, optionally linked. */
-export function richText(content: string, url?: string | null) {
-  return {
-    rich_text: [{ text: { content: content.slice(0, 2000), ...(url && { link: { url } }) } }],
-  };
 }
 
 /**
@@ -419,7 +363,7 @@ export async function syncRepos(env: Env, now = new Date()): Promise<void> {
                     name: repo.isFork ? "Fork" : repo.owner.login === login ? "Own" : "OSS",
                   },
                 },
-                Status: { status: { name: repo.isArchived ? "Deprecated" : "Discovered" } },
+                Status: { status: { name: repo.isArchived ? "Deprecated" : "Planned" } },
                 ...properties,
                 ...synced,
               },
@@ -454,9 +398,4 @@ export async function syncRepos(env: Env, now = new Date()): Promise<void> {
   if (JSON.stringify(nextSnapshot) !== JSON.stringify(snapshot)) {
     await env.PARA_STATE.put("snapshot:repos", JSON.stringify(nextSnapshot));
   }
-}
-
-/** Logs the error class only, never a response body. */
-export function logFailure(error: unknown): void {
-  console.error(`notion write failed: ${error instanceof Error ? error.name : "Error"}`);
 }

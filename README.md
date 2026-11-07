@@ -48,7 +48,7 @@ PARA owns these and fills every one on each write, so none stays empty:
 | Last checked | date                                             | always set, at most once an hour per row                                        |
 | Error        | text                                             | None                                                                            |
 
-`pnpm setup:notion` creates every PARA column except Status, because the Notion API cannot create status properties.
+`pnpm setup:notion` creates the PARA columns of every module whose data source id is set (Infra, Repos, Skills), except Status, because the Notion API cannot create status properties. It warns about columns that exist with the wrong type and leaves them alone.
 Create Status by hand with the four options above.
 
 ## Setup
@@ -56,7 +56,7 @@ Create Status by hand with the four options above.
 1. Create a Notion internal connection with read and update content, and share your services database with it, plus any database its Provider or Resource ID formulas read through relations.
 2. Clone this repo and run `pnpm install`.
 3. Copy `.dev.vars.example` to `.dev.vars` and fill in `NOTION_TOKEN`, `INFRA_DATA_SOURCE_ID`, optionally `REPOS_DATA_SOURCE_ID` and `SKILLS_DATA_SOURCE_ID`, and the provider tokens you use. See [SECURITY.md](SECURITY.md) for scopes.
-4. Run `pnpm setup:notion` to add the PARA-owned properties to the data source.
+4. Run `pnpm setup:notion` to add the PARA-owned properties to each data source you set.
 5. Log in to Cloudflare with `pnpm wrangler login`.
 6. Run `pnpm wrangler kv namespace create PARA_STATE` and put its id in `wrangler.jsonc` when you fork this repo.
 7. Set each secret with `pnpm wrangler secret put NOTION_TOKEN`, and repeat for every other value in `.dev.vars`.
@@ -73,7 +73,7 @@ It runs at minutes 7 and 37 of every hour, apart from the Infra cron, and needs 
 
 Repos rows are keyed by Key, written as `owner/repo`:
 
-- Every repo you own, private ones included, gets a row, created with Status Discovered.
+- Every repo you own, private ones included, gets a row, created with Status Planned.
 - Rows whose Key names a repo you do not own are updated too, so you can track open-source projects.
 - A repo that disappears, or that GitHub archives, gets Status Deprecated. Rows are never deleted.
 - Sync writes Description, GitHub, Domain, Topics, Language, Visibility, Stars, Fork count, Open PRs, Open issues, Default branch, Last commit, Commit message, Latest release, Released, Forked from and Last synced. Name, Origin, Status and your relations stay yours after the row exists.
@@ -83,7 +83,7 @@ Repos rows are keyed by Key, written as `owner/repo`:
 - Only the latest commit on the default branch is kept.
 - A row is written only when one of its synced values changed, so Last synced is the last time something changed.
 
-The repo sync needs these columns on Repos: Key and Description (text), GitHub and Domain (url), Topics (multi-select), Language and Visibility (select), Stars, Fork count, Open PRs and Open issues (number), Default branch, Commit message and Latest release (text), Last commit, Released and Last synced (date), Status (status, with Discovered and Deprecated options), Origin (select) and Forked from (relation to Repos).
+The repo sync needs these columns on Repos: Key and Description (text), GitHub and Domain (url), Topics (multi-select), Language and Visibility (select), Stars, Fork count, Open PRs and Open issues (number), Default branch, Commit message and Latest release (text), Last commit, Released and Last synced (date), Status (status, with Planned and Deprecated options; the template uses Planned, Active, Watching, Shipped and Deprecated), Origin (select) and Forked from (relation to Repos).
 
 ## AI skill and plugin sync
 

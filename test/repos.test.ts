@@ -132,7 +132,7 @@ describe("syncRepos", () => {
     expect(created[0]?.body["properties"]).toMatchObject({
       Name: { title: [{ text: { content: "new" } }] },
       Origin: { select: { name: "Own" } },
-      Status: { status: { name: "Discovered" } },
+      Status: { status: { name: "Planned" } },
       Visibility: { select: { name: "Private" } },
     });
 

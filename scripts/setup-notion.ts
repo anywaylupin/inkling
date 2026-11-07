@@ -1,42 +1,50 @@
 import { Client } from "@notionhq/client";
-import { PARA_PROPERTIES, NOTION_VERSION, STATUS_OPTIONS } from "../src/schema.ts";
+import { MODULES, NOTION_VERSION } from "../src/schema.ts";
 
-const { NOTION_TOKEN, INFRA_DATA_SOURCE_ID } = process.env;
-if (!NOTION_TOKEN || !INFRA_DATA_SOURCE_ID) {
-  console.error("Set NOTION_TOKEN and INFRA_DATA_SOURCE_ID in .dev.vars first.");
+// Adds the columns each enabled module needs; a module is enabled when its data source id is set.
+const { NOTION_TOKEN } = process.env;
+const enabled = Object.entries(MODULES).filter(([, m]) => process.env[m.env]);
+if (!NOTION_TOKEN || enabled.length === 0) {
+  console.error("Set NOTION_TOKEN and at least one data source id in .dev.vars first.");
+  console.error(
+    `Data source ids: ${Object.values(MODULES)
+      .map((m) => m.env)
+      .join(", ")}.`,
+  );
   process.exit(1);
 }
 
 const notion = new Client({ auth: NOTION_TOKEN, notionVersion: NOTION_VERSION });
-const source = await notion.dataSources.retrieve({ data_source_id: INFRA_DATA_SOURCE_ID });
-const existing = "properties" in source ? source.properties : {};
 
-const missing = Object.entries(PARA_PROPERTIES).filter(([name]) => !(name in existing));
-const mismatched = Object.entries(PARA_PROPERTIES).filter(
-  ([name, definition]) => name in existing && existing[name]?.type !== Object.keys(definition)[0],
-);
+for (const [name, module] of enabled) {
+  const id = process.env[module.env] ?? "";
+  const source = await notion.dataSources.retrieve({ data_source_id: id });
+  const existing = "properties" in source ? source.properties : {};
+  const wanted = Object.entries(module.properties(id));
 
-for (const [name, definition] of mismatched) {
-  console.warn(
-    `${name} exists as ${existing[name]?.type}, expected ${Object.keys(definition)[0]}.`,
-  );
-  console.warn("PARA leaves it alone, but writes to it will fail until you change its type.");
-}
+  const missing = wanted.filter(([prop]) => !(prop in existing));
+  for (const [prop, definition] of wanted) {
+    const type = Object.keys(definition ?? {})[0];
+    if (prop in existing && existing[prop]?.type !== type) {
+      console.warn(`${name}: ${prop} exists as ${existing[prop]?.type}, expected ${type}.`);
+      console.warn("PARA leaves it alone, but writes to it will fail until you change its type.");
+    }
+  }
 
-const status = existing["Status"];
-const statusNames = status?.type === "status" ? status.status.options.map((o) => o.name) : [];
-const missingOptions = STATUS_OPTIONS.filter((name) => !statusNames.includes(name));
-if (status?.type !== "status" || missingOptions.length > 0) {
-  console.warn("The API cannot create a status property, so set up Status by hand in Notion:");
-  console.warn(`a property named Status of type Status with options ${STATUS_OPTIONS.join(", ")}.`);
-}
+  const status = existing["Status"];
+  const have = status?.type === "status" ? status.status.options.map((o) => o.name) : [];
+  const lacking = module.statuses.filter((option) => !have.includes(option));
+  if (module.statuses.length > 0 && (status?.type !== "status" || lacking.length > 0)) {
+    console.warn(`${name}: the API cannot create status properties, so set up Status by hand:`);
+    console.warn(
+      `a property named Status of type Status with options ${module.statuses.join(", ")}.`,
+    );
+  }
 
-if (missing.length === 0) {
-  console.log("All PARA properties already exist.");
-} else {
-  await notion.dataSources.update({
-    data_source_id: INFRA_DATA_SOURCE_ID,
-    properties: Object.fromEntries(missing),
-  });
-  console.log(`Added ${missing.map(([name]) => name).join(", ")}.`);
+  if (missing.length === 0) {
+    console.log(`${name}: all PARA properties already exist.`);
+    continue;
+  }
+  await notion.dataSources.update({ data_source_id: id, properties: Object.fromEntries(missing) });
+  console.log(`${name}: added ${missing.map(([prop]) => prop).join(", ")}.`);
 }

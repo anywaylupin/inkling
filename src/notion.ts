@@ -100,7 +100,7 @@ export async function retrievePage(
 }
 
 /** Notion caps a rich text item at 2000 characters; `link` appends a clickable "How to get it". */
-function richText(value: string, link?: string) {
+function helpText(value: string, link?: string) {
   const items: { text: { content: string; link?: { url: string } } }[] = [
     { text: { content: value.slice(0, 2000) } },
   ];
@@ -120,9 +120,39 @@ export function toProperties(check: Check, checkedAt?: string): UpdatePageParame
     Status: { status: { name: check.status } },
     Deployment: { url: check.deployment ?? null },
     Domain: { url: check.domain ?? null },
-    "Deploy state": richText(check.deployState ?? "No deploys"),
-    Error: richText(check.error ?? "None", check.errorLink),
+    "Deploy state": helpText(check.deployState ?? "No deploys"),
+    Error: helpText(check.error ?? "None", check.errorLink),
     ...(lastDeploy && { "Last deploy": { date: { start: lastDeploy } } }),
     ...(checkedAt && { "Last checked": { date: { start: checkedAt } } }),
   };
+}
+
+/** Reads every row of a data source, across all result pages. */
+export async function queryAll(
+  notion: Client,
+  dataSourceId: string,
+): Promise<PageObjectResponse[]> {
+  const pages: PageObjectResponse[] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await notion.dataSources.query({
+      data_source_id: dataSourceId,
+      start_cursor: cursor,
+    });
+    pages.push(...res.results.filter(isFullPage));
+    cursor = res.next_cursor ?? undefined;
+  } while (cursor);
+  return pages;
+}
+
+/** Rich text capped at Notion's 2000 characters, optionally linked. */
+export function richText(content: string, url?: string | null) {
+  return {
+    rich_text: [{ text: { content: content.slice(0, 2000), ...(url && { link: { url } }) } }],
+  };
+}
+
+/** Logs the error class only, never a response body. */
+export function logFailure(error: unknown): void {
+  console.error(`notion write failed: ${error instanceof Error ? error.name : "Error"}`);
 }

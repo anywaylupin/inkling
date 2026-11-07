@@ -1,7 +1,7 @@
 import type { PageObjectResponse } from "@notionhq/client";
 import type { Env } from "./env";
-import { notionClient, text } from "./notion";
-import { graphql, logFailure, queryAll, richText } from "./repos";
+import { graphql } from "./github";
+import { logFailure, notionClient, queryAll, richText, text } from "./notion";
 import { throttle } from "./throttle";
 
 /** owner/repo, or a GitHub URL to the repo or to one folder in it (…/tree/<branch>/<path>). */
