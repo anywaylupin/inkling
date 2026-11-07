@@ -48,15 +48,26 @@ export function targetOf(page: PageObjectResponse): Target | undefined {
 /**
  * Reads the name and description from SKILL.md frontmatter.
  *
- * shortcut: single-line values only; a folded (>) or literal (|) description comes back as that marker, so switch to a YAML parser if skills use them.
+ * Handles plain and quoted single-line values, and folded (>) or literal (|) blocks of indented lines.
+ * shortcut: not a full YAML parser; switch to one if skills use anchors, escapes or multi-line quoted strings.
  */
 export function frontmatter(markdown: string): { name?: string; description?: string } {
-  const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(markdown)?.[1] ?? "";
-  const field = (key: string) =>
-    new RegExp(`^${key}:\\s*(.+)$`, "m")
-      .exec(block)?.[1]
-      ?.trim()
-      .replace(/^(["'])(.*)\1$/, "$2");
+  const lines = (/^---\r?\n([\s\S]*?)\r?\n---/.exec(markdown)?.[1] ?? "").split(/\r?\n/);
+  const field = (key: string) => {
+    const at = lines.findIndex((l) => l.startsWith(`${key}:`));
+    if (at < 0) return undefined;
+    const value = lines[at]?.slice(key.length + 1).trim() ?? "";
+    const block = /^([>|])[-+]?$/.exec(value)?.[1];
+    if (!block) return value.replace(/^(["'])(.*)\1$/, "$2") || undefined;
+    const body: string[] = [];
+    for (const line of lines.slice(at + 1)) {
+      if (line.trim() && !/^\s/.test(line)) break;
+      body.push(line.trim());
+    }
+    return (
+      (block === ">" ? body.join(" ").replace(/\s+/g, " ") : body.join("\n")).trim() || undefined
+    );
+  };
   return { name: field("name"), description: field("description") };
 }
 

@@ -110,6 +110,17 @@ describe("frontmatter", () => {
       description: "Build distinctive interfaces",
     });
   });
+
+  it("joins a folded (>) description and keeps a literal (|) one's lines", () => {
+    const folded =
+      "---\nname: ponytail\ndescription: >\n  Lazy senior dev mode:\n  the smallest change.\nlicense: MIT\n---\n";
+    expect(frontmatter(folded)).toEqual({
+      name: "ponytail",
+      description: "Lazy senior dev mode: the smallest change.",
+    });
+    const literal = "---\ndescription: |-\n  line one\n  line two\n---\n";
+    expect(frontmatter(literal).description).toBe("line one\nline two");
+  });
 });
 
 describe("syncSkills", () => {
